@@ -63,6 +63,11 @@ impl ErrorCode {
     }
 
     #[inline(always)]
+    pub const fn repr(&self) -> u32 {
+        self.value
+    }
+
+    #[inline(always)]
     pub const fn get_module(&self) -> u32 {
         // extract MODULE_BITS lest significant bits
         self.value & !(!0 << MODULE_BITS)

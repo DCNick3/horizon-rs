@@ -4,8 +4,7 @@
 
 //! Defines wrappers around horizon kernel system calls and related types
 
-mod nr;
-use nr::*;
+mod raw;
 
 use bitflags::bitflags;
 use core::arch::asm;
@@ -35,7 +34,7 @@ pub unsafe fn set_heap_size(size: Size) -> Result<Address> {
     let mut address: *mut u8;
     let mut error: u32;
 
-    asm!("svc {0}", in SET_HEAP_SIZE, in("x0") size, lateout("w0") error, lateout("x1") address);
+    asm!("svc 0x1", in("x0") size, lateout("w0") error, lateout("x1") address);
 
     pack_result(address, error)
 }
