@@ -1,23 +1,28 @@
 use anyhow::{anyhow, Context};
-use heck::ToShoutySnakeCase;
+use heck::{ToShoutySnakeCase, ToSnakeCase};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use regex::Regex;
+use scraper::{ElementRef, Html, Selector};
 use semver::Version;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
+use strum::EnumString;
 
 // revision of SVC switchbrew page
 // can be found by clicking on "View history" button and examining the link to the latest revision
 // The link has a form https://switchbrew.org/w/index.php?title=SVC&oldid={revision}
-const REVISION: u32 = 11597;
+const REVISION: u32 = 11748;
 lazy_static! {
     static ref LAST_SUPPORTED_VERSION: Version = Version::parse("13.0.0").unwrap();
 }
+
+const SYSCALL_IGNORE_LIST: &[&str] = &["CallSecureMonitor"]; // it has a problematic argument list. And it's not like it is useful for most applications (I think?)
 
 lazy_static! {
     static ref VERSION_RANGE_REGEX: Regex =
@@ -100,11 +105,231 @@ fn parse_id(id: &str) -> anyhow::Result<(VersionReq, u32)> {
     }
 }
 
+#[derive(Debug)]
 struct Syscall {
+    /// Syscall number
     pub id: u32,
+    /// Name of the syscall
     pub name: String,
+    /// HOS version requirements for this syscall
     #[allow(unused)] // TODO: do come codegen for version requirements or smth
     pub version_req: VersionReq,
+    /// Info on in & out params for this syscall (as they are described on switchbrew)
+    pub params_info: Option<ParamsInfo>,
+    /// raw html from switchbrew in section for this syscall
+    pub raw_docs: Option<String>,
+}
+
+fn split_sections(content: ElementRef) -> anyhow::Result<HashMap<String, String>> {
+    let mut res = HashMap::new();
+    let mut current_section: Option<(String, String)> = None;
+
+    for child in content.children() {
+        if let Some(child) = ElementRef::wrap(child) {
+            if &child.value().name.local == "h2" {
+                if let Some((name, content)) = &mut current_section {
+                    let mut new_content = String::new();
+
+                    std::mem::swap(&mut new_content, content);
+
+                    res.insert(name.clone(), new_content);
+                }
+
+                let section_name = child.text().next().unwrap().trim();
+
+                current_section = Some((section_name.to_string(), String::new()));
+            }
+        }
+
+        if let Some((_, contents)) = &mut current_section {
+            if let Some(el) = ElementRef::wrap(child) {
+                *contents += &el.html();
+            } else if let Some(text) = child.value().as_text() {
+                *contents += &text.text;
+            } else if let Some(_) = child.value().as_comment() {
+                // ignore
+            } else {
+                todo!("Dunno what to do with this node")
+            }
+        }
+    }
+
+    Ok(res)
+}
+
+#[derive(Debug)]
+struct ParamsInfo {
+    pub in_params: Vec<SyscallParam>,
+    pub out_params: Vec<SyscallParam>,
+}
+
+#[derive(Debug, EnumString)]
+enum Register {
+    X0,
+    X1,
+    X2,
+    X3,
+    X4,
+    X5,
+    X6,
+    X7,
+    W0,
+    W1,
+    W2,
+    W3,
+    W4,
+    W5,
+    W6,
+    W7,
+}
+
+impl Register {
+    pub fn is_64bit(&self) -> bool {
+        use Register::*;
+        match self {
+            X0 | X1 | X2 | X3 | X4 | X5 | X6 | X7 => true,
+            W0 | W1 | W2 | W3 | W4 | W5 | W6 | W7 => false,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ParamKind {
+    Result,
+    Integer32,
+    Integer64,
+    Pointer,
+}
+
+#[derive(Debug)]
+enum ParamDirection {
+    In,
+    Out,
+}
+
+#[derive(Debug)]
+struct SyscallParam {
+    pub register: Register,
+    pub kind: ParamKind,
+    pub name: String,
+}
+
+fn parse_syscall_param(
+    register: &str,
+    ty: &str,
+    name: &str,
+) -> anyhow::Result<Option<(ParamDirection, SyscallParam)>> {
+    if register.trim().ends_with("None") {
+        return Ok(None);
+    }
+    let (direction, register) = register
+        .split_once(' ')
+        .context("Splitting register specification by space")?;
+
+    let direction = if direction == "(In)" {
+        ParamDirection::In
+    } else if direction == "(Out)" {
+        ParamDirection::Out
+    } else {
+        todo!("Unknown param direction: {}", direction)
+    };
+
+    let register: Register = Register::from_str(register).context("Unknown register name")?;
+
+    let name = name.to_snake_case();
+
+    let kind = if ty == "#Result" {
+        ParamKind::Result
+    } else if ty.ends_with('*') {
+        assert!(
+            register.is_64bit(),
+            "Non-64 bit register used for a pointer: type = {}, register = {:?}",
+            ty,
+            register,
+        );
+        ParamKind::Pointer
+    } else if register.is_64bit() {
+        ParamKind::Integer64
+    } else {
+        ParamKind::Integer32
+    };
+
+    Ok(Some((
+        direction,
+        SyscallParam {
+            register,
+            kind,
+            name,
+        },
+    )))
+}
+
+fn parse_syscall_params(html: &str) -> anyhow::Result<ParamsInfo> {
+    let mut params = Vec::new();
+
+    let mut handle_param = |i: usize, register: &str, ty: &str, name: &str| -> anyhow::Result<()> {
+        let ty = if ty.is_empty() {
+            "".to_string()
+        } else {
+            Html::parse_fragment(ty)
+                .root_element()
+                .text()
+                .next()
+                .context("Converting type element to text")?
+                .to_string()
+        };
+
+        // sometimes parameters in switchbrew don't have names
+        let name = if name.is_empty() {
+            format!("unnamed_{}", i + 1)
+        } else {
+            name.to_string()
+        };
+
+        params.push(
+            parse_syscall_param(register, &ty, &name)
+                .with_context(|| format!("Parsing parameter {}", name))?,
+        );
+
+        Ok(())
+    };
+
+    if let Some(table) = table_extract::Table::find_by_headers(html, &["Argument", "Type", "Name"])
+    {
+        for (i, row) in table.iter().enumerate() {
+            let register = row.get("Argument").unwrap();
+            let ty = row.get("Type").unwrap();
+            let name = row.get("Name").unwrap();
+
+            handle_param(i, register, ty, name)?;
+        }
+    } else if let Some(table) =
+        table_extract::Table::find_by_headers(html, &["Argument64", "Argument32", "Type", "Name"])
+    {
+        for (i, row) in table.iter().enumerate() {
+            let register = row.get("Argument64").unwrap();
+            let ty = row.get("Type").unwrap();
+            let name = row.get("Name").unwrap_or(""); // special case for GetDebugFutureThreadInfo... So, unnamed params are possible
+
+            handle_param(i, register, ty, name)?;
+        }
+    } else {
+        todo!("Unknown parameter table form")
+    };
+
+    let mut res = ParamsInfo {
+        in_params: Vec::new(),
+        out_params: Vec::new(),
+    };
+
+    for (dir, param) in params.into_iter().flatten() {
+        match dir {
+            ParamDirection::In => res.in_params.push(param),
+            ParamDirection::Out => res.out_params.push(param),
+        }
+    }
+
+    Ok(res)
 }
 
 fn get_syscalls() -> anyhow::Result<Vec<Syscall>> {
@@ -119,6 +344,15 @@ fn get_syscalls() -> anyhow::Result<Vec<Syscall>> {
     let table =
         table_extract::Table::find_by_headers(&html, &["ID", "Return Type", "Name", "Arguments"])
             .context("Finding syscall table on the page")?;
+
+    let html = Html::parse_fragment(&html);
+
+    let document_content = html
+        .select(&Selector::parse(".mw-parser-output").unwrap())
+        .next()
+        .unwrap();
+
+    let sections = split_sections(document_content)?;
 
     let mut res = Vec::new();
 
@@ -142,12 +376,28 @@ fn get_syscalls() -> anyhow::Result<Vec<Syscall>> {
             c.get(1).unwrap().as_str()
         };
 
+        if SYSCALL_IGNORE_LIST.contains(&name) {
+            continue;
+        }
+
         let (version_req, id) = parse_id(id)?;
+
+        let raw_docs = sections.get(name).cloned();
+
+        let params_info = raw_docs
+            .as_ref()
+            .map(|docs| parse_syscall_params(docs))
+            .map_or(Ok(None), |v| v.map(Some))
+            .with_context(|| format!("Parsing parameters info for syscall {}", name))?;
+
+        dbg!(&params_info);
 
         res.push(Syscall {
             id,
             name: name.to_string(),
             version_req,
+            params_info,
+            raw_docs,
         });
     }
 

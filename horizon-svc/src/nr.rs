@@ -125,4 +125,3 @@ pub const TERMINATE_PROCESS: u32 = 0x7b;
 pub const GET_PROCESS_INFO: u32 = 0x7c;
 pub const CREATE_RESOURCE_LIMIT: u32 = 0x7d;
 pub const SET_RESOURCE_LIMIT_LIMIT_VALUE: u32 = 0x7e;
-pub const CALL_SECURE_MONITOR: u32 = 0x7f;
