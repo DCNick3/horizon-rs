@@ -5,22 +5,22 @@
 use core::arch::asm;
 use horizon_error::ErrorCode;
 pub struct SetHeapSizeResult {
-    result: ErrorCode,
-    heap_address: *mut u8,
+    pub result: ErrorCode,
+    pub heap_address: *mut u8,
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn set_heap_size(size: u32) -> SetHeapSizeResult {
+pub unsafe fn set_heap_size(size: u64) -> SetHeapSizeResult {
     let result: u32;
     let heap_address: *mut u8;
-    asm ! ("svc 0x01" , in ("w1") size , lateout ("w0") result , lateout ("x1") heap_address ,);
+    asm ! ("svc 0x01" , in ("x1") size , lateout ("w0") result , lateout ("x1") heap_address ,);
     SetHeapSizeResult {
         result: ErrorCode::new_unchecked(result),
         heap_address: heap_address,
     }
 }
 pub struct SetMemoryPermissionResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -36,7 +36,7 @@ pub unsafe fn set_memory_permission(
     }
 }
 pub struct SetMemoryAttributeResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -53,7 +53,7 @@ pub unsafe fn set_memory_attribute(
     }
 }
 pub struct MapMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -65,7 +65,7 @@ pub unsafe fn map_memory(dst_address: *mut u8, src_address: *mut u8, size: u64) 
     }
 }
 pub struct UnmapMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -81,8 +81,8 @@ pub unsafe fn unmap_memory(
     }
 }
 pub struct QueryMemoryResult {
-    result: ErrorCode,
-    page_info: u32,
+    pub result: ErrorCode,
+    pub page_info: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -103,8 +103,8 @@ pub unsafe fn exit_process() -> ExitProcessResult {
     ExitProcessResult {}
 }
 pub struct CreateThreadResult {
-    result: ErrorCode,
-    thread_handle: u32,
+    pub result: ErrorCode,
+    pub thread_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -145,8 +145,8 @@ pub unsafe fn sleep_thread(nanoseconds: u64) -> SleepThreadResult {
     SleepThreadResult {}
 }
 pub struct GetThreadPriorityResult {
-    result: ErrorCode,
-    priority: u32,
+    pub result: ErrorCode,
+    pub priority: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -160,7 +160,7 @@ pub unsafe fn get_thread_priority(thread_handle: u32) -> GetThreadPriorityResult
     }
 }
 pub struct SetThreadPriorityResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -172,9 +172,9 @@ pub unsafe fn set_thread_priority(thread_handle: u32, priority: u32) -> SetThrea
     }
 }
 pub struct GetThreadCoreMaskResult {
-    result: ErrorCode,
-    core_mask0: u32,
-    core_mask1: u64,
+    pub result: ErrorCode,
+    pub core_mask0: u32,
+    pub core_mask1: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -190,7 +190,7 @@ pub unsafe fn get_thread_core_mask(thread_handle: u32) -> GetThreadCoreMaskResul
     }
 }
 pub struct SetThreadCoreMaskResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -206,7 +206,7 @@ pub unsafe fn set_thread_core_mask(
     }
 }
 pub struct GetCurrentProcessorNumberResult {
-    cpu_id: u32,
+    pub cpu_id: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -216,7 +216,7 @@ pub unsafe fn get_current_processor_number() -> GetCurrentProcessorNumberResult 
     GetCurrentProcessorNumberResult { cpu_id: cpu_id }
 }
 pub struct SignalEventResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -228,7 +228,7 @@ pub unsafe fn signal_event(event_handle: u32) -> SignalEventResult {
     }
 }
 pub struct ClearEventResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -240,7 +240,7 @@ pub unsafe fn clear_event(event_handle: u32) -> ClearEventResult {
     }
 }
 pub struct MapSharedMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -257,7 +257,7 @@ pub unsafe fn map_shared_memory(
     }
 }
 pub struct UnmapSharedMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -273,8 +273,8 @@ pub unsafe fn unmap_shared_memory(
     }
 }
 pub struct CreateTransferMemoryResult {
-    result: ErrorCode,
-    transfer_memory_handle: u32,
+    pub result: ErrorCode,
+    pub transfer_memory_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -292,7 +292,7 @@ pub unsafe fn create_transfer_memory(
     }
 }
 pub struct CloseHandleResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -304,7 +304,7 @@ pub unsafe fn close_handle(handle: u32) -> CloseHandleResult {
     }
 }
 pub struct ResetSignalResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -316,8 +316,8 @@ pub unsafe fn reset_signal(handle: u32) -> ResetSignalResult {
     }
 }
 pub struct WaitSynchronizationResult {
-    result: ErrorCode,
-    handle_index: u32,
+    pub result: ErrorCode,
+    pub handle_index: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -335,7 +335,7 @@ pub unsafe fn wait_synchronization(
     }
 }
 pub struct CancelSynchronizationResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -347,7 +347,7 @@ pub unsafe fn cancel_synchronization(thread_handle: u32) -> CancelSynchronizatio
     }
 }
 pub struct ArbitrateLockResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -363,7 +363,7 @@ pub unsafe fn arbitrate_lock(
     }
 }
 pub struct ArbitrateUnlockResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -375,7 +375,7 @@ pub unsafe fn arbitrate_unlock(address: *mut u8) -> ArbitrateUnlockResult {
     }
 }
 pub struct WaitProcessWideKeyAtomicResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -392,7 +392,7 @@ pub unsafe fn wait_process_wide_key_atomic(
     }
 }
 pub struct SignalProcessWideKeyResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -404,7 +404,7 @@ pub unsafe fn signal_process_wide_key(address: *mut u8, value: u32) -> SignalPro
     }
 }
 pub struct GetSystemTickResult {
-    ticks: u64,
+    pub ticks: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -414,8 +414,8 @@ pub unsafe fn get_system_tick() -> GetSystemTickResult {
     GetSystemTickResult { ticks: ticks }
 }
 pub struct ConnectToNamedPortResult {
-    result: ErrorCode,
-    session_handle: u32,
+    pub result: ErrorCode,
+    pub session_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -429,7 +429,7 @@ pub unsafe fn connect_to_named_port(port_name: *mut u8) -> ConnectToNamedPortRes
     }
 }
 pub struct SendSyncRequestLightResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -441,7 +441,7 @@ pub unsafe fn send_sync_request_light(session_handle: u32) -> SendSyncRequestLig
     }
 }
 pub struct SendSyncRequestResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -453,7 +453,7 @@ pub unsafe fn send_sync_request(session_handle: u32) -> SendSyncRequestResult {
     }
 }
 pub struct SendSyncRequestWithUserBufferResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -469,8 +469,8 @@ pub unsafe fn send_sync_request_with_user_buffer(
     }
 }
 pub struct SendAsyncRequestWithUserBufferResult {
-    result: ErrorCode,
-    event_handle: u32,
+    pub result: ErrorCode,
+    pub event_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -488,8 +488,8 @@ pub unsafe fn send_async_request_with_user_buffer(
     }
 }
 pub struct GetProcessIdResult {
-    result: ErrorCode,
-    process_id: u64,
+    pub result: ErrorCode,
+    pub process_id: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -503,8 +503,8 @@ pub unsafe fn get_process_id(process_handle: u32) -> GetProcessIdResult {
     }
 }
 pub struct GetThreadIdResult {
-    result: ErrorCode,
-    thread_id: u64,
+    pub result: ErrorCode,
+    pub thread_id: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -518,7 +518,7 @@ pub unsafe fn get_thread_id(thread_handle: u32) -> GetThreadIdResult {
     }
 }
 pub struct BreakResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -530,7 +530,7 @@ pub unsafe fn r#break(break_reason: u64, unnamed_2: u64, info: u64) -> BreakResu
     }
 }
 pub struct OutputDebugStringResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -549,8 +549,8 @@ pub unsafe fn return_from_exception(result: ErrorCode) -> ReturnFromExceptionRes
     ReturnFromExceptionResult {}
 }
 pub struct GetInfoResult {
-    result: ErrorCode,
-    info: u64,
+    pub result: ErrorCode,
+    pub info: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -571,7 +571,7 @@ pub unsafe fn flush_entire_data_cache() -> FlushEntireDataCacheResult {
     FlushEntireDataCacheResult {}
 }
 pub struct FlushDataCacheResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -583,7 +583,7 @@ pub unsafe fn flush_data_cache(address: *mut u8, size: u64) -> FlushDataCacheRes
     }
 }
 pub struct MapPhysicalMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -595,7 +595,7 @@ pub unsafe fn map_physical_memory(address: *mut u8, size: u64) -> MapPhysicalMem
     }
 }
 pub struct UnmapPhysicalMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -607,13 +607,13 @@ pub unsafe fn unmap_physical_memory(address: *mut u8, size: u64) -> UnmapPhysica
     }
 }
 pub struct GetDebugFutureThreadInfoResult {
-    result: ErrorCode,
-    unnamed_3: u64,
-    unnamed_4: u64,
-    unnamed_5: u64,
-    unnamed_6: u64,
-    unnamed_7: u64,
-    unnamed_8: u32,
+    pub result: ErrorCode,
+    pub unnamed_3: u64,
+    pub unnamed_4: u64,
+    pub unnamed_5: u64,
+    pub unnamed_6: u64,
+    pub unnamed_7: u64,
+    pub unnamed_8: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -637,13 +637,13 @@ pub unsafe fn get_debug_future_thread_info(timeout: u64) -> GetDebugFutureThread
     }
 }
 pub struct GetLastThreadInfoResult {
-    result: ErrorCode,
-    last_thread_context_param0: u64,
-    last_thread_context_param1: u64,
-    last_thread_context_param2: u64,
-    last_thread_context_param3: u64,
-    unnamed_7: u64,
-    unnamed_8: u32,
+    pub result: ErrorCode,
+    pub last_thread_context_param0: u64,
+    pub last_thread_context_param1: u64,
+    pub last_thread_context_param2: u64,
+    pub last_thread_context_param3: u64,
+    pub unnamed_7: u64,
+    pub unnamed_8: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -667,8 +667,8 @@ pub unsafe fn get_last_thread_info() -> GetLastThreadInfoResult {
     }
 }
 pub struct GetResourceLimitLimitValueResult {
-    result: ErrorCode,
-    limit_value: u64,
+    pub result: ErrorCode,
+    pub limit_value: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -685,8 +685,8 @@ pub unsafe fn get_resource_limit_limit_value(
     }
 }
 pub struct GetResourceLimitCurrentValueResult {
-    result: ErrorCode,
-    current_value: u64,
+    pub result: ErrorCode,
+    pub current_value: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -703,7 +703,7 @@ pub unsafe fn get_resource_limit_current_value(
     }
 }
 pub struct SetThreadActivityResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -718,7 +718,7 @@ pub unsafe fn set_thread_activity(
     }
 }
 pub struct GetThreadContext3Result {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -733,7 +733,7 @@ pub unsafe fn get_thread_context3(
     }
 }
 pub struct WaitForAddressResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -750,7 +750,7 @@ pub unsafe fn wait_for_address(
     }
 }
 pub struct SignalToAddressResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -774,8 +774,8 @@ pub unsafe fn synchronize_preemption_state() -> SynchronizePreemptionStateResult
     SynchronizePreemptionStateResult {}
 }
 pub struct GetResourceLimitPeakValueResult {
-    result: ErrorCode,
-    peak_value: u64,
+    pub result: ErrorCode,
+    pub peak_value: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -792,7 +792,7 @@ pub unsafe fn get_resource_limit_peak_value(
     }
 }
 pub struct DumpInfoResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -804,7 +804,7 @@ pub unsafe fn dump_info(dump_info_type: u64, dump_info_sub_type: u64) -> DumpInf
     }
 }
 pub struct KernelDebugResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -821,7 +821,7 @@ pub unsafe fn kernel_debug(
     }
 }
 pub struct ChangeKernelTraceStateResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -833,9 +833,9 @@ pub unsafe fn change_kernel_trace_state(kernel_trace_state: u32) -> ChangeKernel
     }
 }
 pub struct CreateSessionResult {
-    result: ErrorCode,
-    server_session_handle: u32,
-    client_session_handle: u32,
+    pub result: ErrorCode,
+    pub server_session_handle: u32,
+    pub client_session_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -851,8 +851,8 @@ pub unsafe fn create_session(is_light: u32, name: u64) -> CreateSessionResult {
     }
 }
 pub struct AcceptSessionResult {
-    result: ErrorCode,
-    server_session_handle: u32,
+    pub result: ErrorCode,
+    pub server_session_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -866,7 +866,7 @@ pub unsafe fn accept_session(port_handle: u32) -> AcceptSessionResult {
     }
 }
 pub struct ReplyAndReceiveLightResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -878,8 +878,8 @@ pub unsafe fn reply_and_receive_light(handle: u32) -> ReplyAndReceiveLightResult
     }
 }
 pub struct ReplyAndReceiveResult {
-    result: ErrorCode,
-    handle_index: u32,
+    pub result: ErrorCode,
+    pub handle_index: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -898,8 +898,8 @@ pub unsafe fn reply_and_receive(
     }
 }
 pub struct ReplyAndReceiveWithUserBufferResult {
-    result: ErrorCode,
-    handle_index: u32,
+    pub result: ErrorCode,
+    pub handle_index: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -920,9 +920,9 @@ pub unsafe fn reply_and_receive_with_user_buffer(
     }
 }
 pub struct CreateEventResult {
-    result: ErrorCode,
-    writable_event_handle: u32,
-    readable_event_handle: u32,
+    pub result: ErrorCode,
+    pub writable_event_handle: u32,
+    pub readable_event_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -938,7 +938,7 @@ pub unsafe fn create_event() -> CreateEventResult {
     }
 }
 pub struct MapPhysicalMemoryUnsafeResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -953,7 +953,7 @@ pub unsafe fn map_physical_memory_unsafe(
     }
 }
 pub struct UnmapPhysicalMemoryUnsafeResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -968,7 +968,7 @@ pub unsafe fn unmap_physical_memory_unsafe(
     }
 }
 pub struct SetUnsafeLimitResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -980,8 +980,8 @@ pub unsafe fn set_unsafe_limit(limit: u64) -> SetUnsafeLimitResult {
     }
 }
 pub struct CreateCodeMemoryResult {
-    result: ErrorCode,
-    code_memory_handle: u32,
+    pub result: ErrorCode,
+    pub code_memory_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -995,7 +995,7 @@ pub unsafe fn create_code_memory(address: *mut u8, size: u64) -> CreateCodeMemor
     }
 }
 pub struct ControlCodeMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1020,8 +1020,8 @@ pub unsafe fn sleep_system() -> SleepSystemResult {
     SleepSystemResult {}
 }
 pub struct ReadWriteRegisterResult {
-    result: ErrorCode,
-    out_value: u32,
+    pub result: ErrorCode,
+    pub out_value: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1039,7 +1039,7 @@ pub unsafe fn read_write_register(
     }
 }
 pub struct SetProcessActivityResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1054,8 +1054,8 @@ pub unsafe fn set_process_activity(
     }
 }
 pub struct CreateSharedMemoryResult {
-    result: ErrorCode,
-    shared_memory_handle: u32,
+    pub result: ErrorCode,
+    pub shared_memory_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1073,7 +1073,7 @@ pub unsafe fn create_shared_memory(
     }
 }
 pub struct MapTransferMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1090,7 +1090,7 @@ pub unsafe fn map_transfer_memory(
     }
 }
 pub struct UnmapTransferMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1106,8 +1106,8 @@ pub unsafe fn unmap_transfer_memory(
     }
 }
 pub struct CreateInterruptEventResult {
-    result: ErrorCode,
-    readable_event_handle: u32,
+    pub result: ErrorCode,
+    pub readable_event_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1124,10 +1124,10 @@ pub unsafe fn create_interrupt_event(
     }
 }
 pub struct QueryPhysicalAddressResult {
-    result: ErrorCode,
-    physical_memory_info_address: u64,
-    physical_memory_info_base_address: u64,
-    physical_memory_info_size: u64,
+    pub result: ErrorCode,
+    pub physical_memory_info_address: u64,
+    pub physical_memory_info_base_address: u64,
+    pub physical_memory_info_size: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -1145,8 +1145,8 @@ pub unsafe fn query_physical_address(virtual_address: *mut u8) -> QueryPhysicalA
     }
 }
 pub struct QueryIoMappingResult {
-    result: ErrorCode,
-    virtual_address: *mut u8,
+    pub result: ErrorCode,
+    pub virtual_address: *mut u8,
 }
 #[inline(always)]
 #[must_use]
@@ -1160,8 +1160,8 @@ pub unsafe fn query_io_mapping(io_address: u64, size: u64) -> QueryIoMappingResu
     }
 }
 pub struct CreateDeviceAddressSpaceResult {
-    result: ErrorCode,
-    device_address_space_handle: u32,
+    pub result: ErrorCode,
+    pub device_address_space_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1178,7 +1178,7 @@ pub unsafe fn create_device_address_space(
     }
 }
 pub struct AttachDeviceAddressSpaceResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1193,7 +1193,7 @@ pub unsafe fn attach_device_address_space(
     }
 }
 pub struct DetachDeviceAddressSpaceResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1208,7 +1208,7 @@ pub unsafe fn detach_device_address_space(
     }
 }
 pub struct MapDeviceAddressSpaceByForceResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1227,7 +1227,7 @@ pub unsafe fn map_device_address_space_by_force(
     }
 }
 pub struct MapDeviceAddressSpaceAlignedResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1246,8 +1246,8 @@ pub unsafe fn map_device_address_space_aligned(
     }
 }
 pub struct MapDeviceAddressSpaceResult {
-    result: ErrorCode,
-    size: u64,
+    pub result: ErrorCode,
+    pub size: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -1268,7 +1268,7 @@ pub unsafe fn map_device_address_space(
     }
 }
 pub struct UnmapDeviceAddressSpaceResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1286,7 +1286,7 @@ pub unsafe fn unmap_device_address_space(
     }
 }
 pub struct InvalidateProcessDataCacheResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1302,7 +1302,7 @@ pub unsafe fn invalidate_process_data_cache(
     }
 }
 pub struct StoreProcessDataCacheResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1318,7 +1318,7 @@ pub unsafe fn store_process_data_cache(
     }
 }
 pub struct FlushProcessDataCacheResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1334,8 +1334,8 @@ pub unsafe fn flush_process_data_cache(
     }
 }
 pub struct DebugActiveProcessResult {
-    result: ErrorCode,
-    debug_handle: u32,
+    pub result: ErrorCode,
+    pub debug_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1349,7 +1349,7 @@ pub unsafe fn debug_active_process(process_id: u64) -> DebugActiveProcessResult 
     }
 }
 pub struct BreakDebugProcessResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1361,7 +1361,7 @@ pub unsafe fn break_debug_process(debug_handle: u32) -> BreakDebugProcessResult 
     }
 }
 pub struct TerminateDebugProcessResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1373,7 +1373,7 @@ pub unsafe fn terminate_debug_process(debug_handle: u32) -> TerminateDebugProces
     }
 }
 pub struct GetDebugEventResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1385,8 +1385,8 @@ pub unsafe fn get_debug_event(debug_event_info: u64, debug_handle: u32) -> GetDe
     }
 }
 pub struct GetProcessListResult {
-    result: ErrorCode,
-    num_processes: u32,
+    pub result: ErrorCode,
+    pub num_processes: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1403,8 +1403,8 @@ pub unsafe fn get_process_list(
     }
 }
 pub struct GetThreadListResult {
-    result: ErrorCode,
-    num_threads: u32,
+    pub result: ErrorCode,
+    pub num_threads: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1422,7 +1422,7 @@ pub unsafe fn get_thread_list(
     }
 }
 pub struct GetDebugThreadContextResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1439,7 +1439,7 @@ pub unsafe fn get_debug_thread_context(
     }
 }
 pub struct SetDebugThreadContextResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1456,8 +1456,8 @@ pub unsafe fn set_debug_thread_context(
     }
 }
 pub struct QueryDebugProcessMemoryResult {
-    result: ErrorCode,
-    page_info: u32,
+    pub result: ErrorCode,
+    pub page_info: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1475,7 +1475,7 @@ pub unsafe fn query_debug_process_memory(
     }
 }
 pub struct ReadDebugProcessMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1492,7 +1492,7 @@ pub unsafe fn read_debug_process_memory(
     }
 }
 pub struct WriteDebugProcessMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1509,7 +1509,7 @@ pub unsafe fn write_debug_process_memory(
     }
 }
 pub struct SetHardwareBreakPointResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1525,9 +1525,9 @@ pub unsafe fn set_hardware_break_point(
     }
 }
 pub struct GetDebugThreadParamResult {
-    result: ErrorCode,
-    out0: u64,
-    out1: u32,
+    pub result: ErrorCode,
+    pub out0: u64,
+    pub out1: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1547,8 +1547,8 @@ pub unsafe fn get_debug_thread_param(
     }
 }
 pub struct GetSystemInfoResult {
-    result: ErrorCode,
-    system_info: u64,
+    pub result: ErrorCode,
+    pub system_info: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -1566,9 +1566,9 @@ pub unsafe fn get_system_info(
     }
 }
 pub struct CreatePortResult {
-    result: ErrorCode,
-    server_port_handle: u32,
-    client_port_handle: u32,
+    pub result: ErrorCode,
+    pub server_port_handle: u32,
+    pub client_port_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1584,8 +1584,8 @@ pub unsafe fn create_port(max_sessions: u32, is_light: u32, name: u64) -> Create
     }
 }
 pub struct ManageNamedPortResult {
-    result: ErrorCode,
-    server_port_handle: u32,
+    pub result: ErrorCode,
+    pub server_port_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1599,8 +1599,8 @@ pub unsafe fn manage_named_port(name: *mut u8, max_sessions: u32) -> ManageNamed
     }
 }
 pub struct ConnectToPortResult {
-    result: ErrorCode,
-    session_handle: u32,
+    pub result: ErrorCode,
+    pub session_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1614,7 +1614,7 @@ pub unsafe fn connect_to_port(client_port_handle: u32) -> ConnectToPortResult {
     }
 }
 pub struct SetProcessMemoryPermissionResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1631,7 +1631,7 @@ pub unsafe fn set_process_memory_permission(
     }
 }
 pub struct MapProcessMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1648,7 +1648,7 @@ pub unsafe fn map_process_memory(
     }
 }
 pub struct UnmapProcessMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1665,8 +1665,8 @@ pub unsafe fn unmap_process_memory(
     }
 }
 pub struct QueryProcessMemoryResult {
-    result: ErrorCode,
-    page_info: u32,
+    pub result: ErrorCode,
+    pub page_info: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1684,7 +1684,7 @@ pub unsafe fn query_process_memory(
     }
 }
 pub struct MapProcessCodeMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1701,7 +1701,7 @@ pub unsafe fn map_process_code_memory(
     }
 }
 pub struct UnmapProcessCodeMemoryResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1718,8 +1718,8 @@ pub unsafe fn unmap_process_code_memory(
     }
 }
 pub struct CreateProcessResult {
-    result: ErrorCode,
-    process_handle: u32,
+    pub result: ErrorCode,
+    pub process_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1737,7 +1737,7 @@ pub unsafe fn create_process(
     }
 }
 pub struct StartProcessResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1754,7 +1754,7 @@ pub unsafe fn start_process(
     }
 }
 pub struct TerminateProcessResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]
@@ -1766,8 +1766,8 @@ pub unsafe fn terminate_process(process_handle: u32) -> TerminateProcessResult {
     }
 }
 pub struct GetProcessInfoResult {
-    result: ErrorCode,
-    a_href_process_state_process_state_a: u64,
+    pub result: ErrorCode,
+    pub a_href_process_state_process_state_a: u64,
 }
 #[inline(always)]
 #[must_use]
@@ -1784,8 +1784,8 @@ pub unsafe fn get_process_info(
     }
 }
 pub struct CreateResourceLimitResult {
-    result: ErrorCode,
-    resource_limit_handle: u32,
+    pub result: ErrorCode,
+    pub resource_limit_handle: u32,
 }
 #[inline(always)]
 #[must_use]
@@ -1799,7 +1799,7 @@ pub unsafe fn create_resource_limit() -> CreateResourceLimitResult {
     }
 }
 pub struct SetResourceLimitLimitValueResult {
-    result: ErrorCode,
+    pub result: ErrorCode,
 }
 #[inline(always)]
 #[must_use]

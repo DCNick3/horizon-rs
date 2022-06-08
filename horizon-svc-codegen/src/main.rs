@@ -17,7 +17,7 @@ use strum::EnumString;
 // revision of SVC switchbrew page
 // can be found by clicking on "View history" button and examining the link to the latest revision
 // The link has a form https://switchbrew.org/w/index.php?title=SVC&oldid={revision}
-const REVISION: u32 = 11748;
+const REVISION: u32 = 11749;
 lazy_static! {
     static ref LAST_SUPPORTED_VERSION: Version = Version::parse("13.0.0").unwrap();
 }
@@ -574,7 +574,7 @@ fn codegen(syscalls: &Vec<Syscall>) -> anyhow::Result<String> {
 
             ts.extend([quote! {
                 pub struct #result_struct_name {
-                    #(#out_names: #out_types,)*
+                    #(pub #out_names: #out_types,)*
                 }
 
                 #[inline(always)]

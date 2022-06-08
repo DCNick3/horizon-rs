@@ -7,13 +7,15 @@
 mod raw;
 
 use bitflags::bitflags;
-use core::arch::asm;
-use horizon_error::{ErrorCode, Result};
+use horizon_error::Result;
 
-pub type Address = *const u8;
+pub type Address = *mut u8;
 pub type Size = usize;
 pub type ThreadEntrypointFn = unsafe extern "C" fn(*mut u8) -> !;
 pub type AddressRange = (Address, Size);
+
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("Only 64-bit mode is supported");
 
 bitflags! {
     pub struct MemoryPermission: u32 {
@@ -24,36 +26,29 @@ bitflags! {
     }
 }
 
-/// # Safety
-/// `error_code` is a valid error code according to `ErrorCode::new_unchecked`
-unsafe fn pack_result<T>(ok_result: T, error_code: u32) -> Result<T> {
-    ErrorCode::new_unchecked(error_code).into_result(ok_result)
-}
-
 pub unsafe fn set_heap_size(size: Size) -> Result<Address> {
-    let mut address: *mut u8;
-    let mut error: u32;
+    let res = raw::set_heap_size(size as _); // usize -> u64
 
-    asm!("svc 0x1", in("x0") size, lateout("w0") error, lateout("x1") address);
-
-    pack_result(address, error)
+    res.result.into_result(res.heap_address)
 }
 
 pub unsafe fn set_memory_permission(
-    range: AddressRange,
+    (address, size): AddressRange,
     permission: MemoryPermission,
 ) -> Result<()> {
-    let mut error: u32;
-
-    asm!("svc 0x2", in("x0") range.0, in("x1") range.1, in("w2") permission.bits, lateout("w0") error);
-
-    pack_result((), error)
+    raw::set_memory_permission(address, size as _, permission.bits)
+        .result
+        .into_result(())
 }
 
-pub unsafe fn map_physical_memory(range: AddressRange) -> Result<()> {
-    let mut error: u32;
+pub unsafe fn map_physical_memory((address, size): AddressRange) -> Result<()> {
+    raw::map_physical_memory(address, size as _)
+        .result
+        .into_result(())
+}
 
-    asm!("svc 0x2C", in("x0") range.0, in("x1") range.1, lateout("w0") error);
-
-    pack_result((), error)
+pub unsafe fn unmap_physical_memory((address, size): AddressRange) -> Result<()> {
+    raw::unmap_physical_memory(address, size as _)
+        .result
+        .into_result(())
 }
