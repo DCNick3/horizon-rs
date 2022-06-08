@@ -3,5 +3,6 @@
 members = [
     "horizon-error",
     "horizon-svc",
+    "horizon-svc-codegen",
 ]
 
