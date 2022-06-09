@@ -1,7 +1,12 @@
 #![no_std]
 #![allow(clippy::missing_safety_doc)]
 
-use core::arch::{asm, global_asm};
+mod relocate;
+mod rt_abort;
+
+use crate::relocate::{relocate_with_dyn, Dyn};
+use crate::rt_abort::{rt_abort, RtAbortReason};
+use core::arch::global_asm;
 
 // define _start
 // what happens at the start of a file
@@ -135,28 +140,30 @@ static mut __HORIZON_RT_STACK_TOP: u64 = 0;
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_exception_entry() {
     // TODO: implement this
-    asm!(".inst   0xe7f000f0");
+    rt_abort(RtAbortReason::NotImplemented)
 }
 
 // called to parse the .dynamic section and perform relocations
 // it's very important that this function does not need any relocations applied to succeed, otherwise we are in trouble :P
 // _hopefully_ it doesn't touch any globals, so it should  be fine
 #[no_mangle]
-pub unsafe extern "C" fn __horizon_rt_relocate(_aslr_base: u64, _dynamic_section: u64) {
-    // TODO: implement this
-    asm!(".inst   0xe7f000f0");
+pub unsafe extern "C" fn __horizon_rt_relocate(aslr_base: u64, dynamic_section: u64) {
+    relocate_with_dyn(
+        aslr_base as usize as *const u8,
+        dynamic_section as usize as *const Dyn,
+    )
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_init(_x0: u64, _x1: u64, _saved_lr: u64) {
     // TODO: implement this
-    asm!(".inst   0xe7f000f0");
+    rt_abort(RtAbortReason::NotImplemented)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_exit(_exit_code: u32) {
     // TODO: implement this
-    asm!(".inst   0xe7f000f0");
+    rt_abort(RtAbortReason::NotImplemented)
 }
 
 // define the MOD0 header

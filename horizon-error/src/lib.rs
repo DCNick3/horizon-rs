@@ -8,6 +8,11 @@ const SUCCESS_VALUE: u32 = 0;
 const MODULE_BITS: u32 = 9;
 const DESCRIPTION_BITS: u32 = 13;
 
+const MODULE_MASK: u32 = !(!0 << MODULE_BITS);
+
+/// this mask is not shifted!
+const DESCRIPTION_MASK: u32 = !(!0 << DESCRIPTION_BITS);
+
 /// Represents a horizon code, also known as ErrorCode in other parts of the ecosystem
 #[derive(Copy, Clone, PartialEq, Eq, Default)]
 #[repr(transparent)]
@@ -52,6 +57,12 @@ impl ErrorCode {
         Self { value }
     }
 
+    pub const fn from_parts(module: u32, desc: u32) -> Self {
+        let value = (module & MODULE_MASK) | (desc & DESCRIPTION_MASK) << MODULE_BITS;
+
+        unsafe { Self::new_unchecked(value) }
+    }
+
     #[inline(always)]
     pub const fn is_success(&self) -> bool {
         self.value == SUCCESS_VALUE
@@ -70,13 +81,13 @@ impl ErrorCode {
     #[inline(always)]
     pub const fn get_module(&self) -> u32 {
         // extract MODULE_BITS lest significant bits
-        self.value & !(!0 << MODULE_BITS)
+        self.value & MODULE_MASK
     }
 
     #[inline(always)]
     pub const fn get_description(&self) -> u32 {
         // extract DESCRIPTION_BITS bits after MODULE_BITS
-        (self.value >> MODULE_BITS) & !(!0 << DESCRIPTION_BITS)
+        (self.value >> MODULE_BITS) & DESCRIPTION_MASK
     }
 
     #[inline(always)]

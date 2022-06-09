@@ -27,6 +27,20 @@ bitflags! {
     }
 }
 
+bitflags! {
+    pub struct BreakReason: u64 {
+        const PANIC                  = 0;
+        const ASSERT                 = 1;
+        const USER                   = 2;
+        const PRE_LOAD_DLL           = 3;
+        const POST_LOAD_DLL          = 4;
+        const PRE_UNLOAD_DLL         = 5;
+        const POST_UNLOAD_DLL        = 6;
+        const CPP_EXCEPTION          = 7;
+        const NOTIFICATION_ONLY_FLAG = 0x80000000;
+    }
+}
+
 pub unsafe fn set_heap_size(size: Size) -> Result<Address> {
     let res = raw::set_heap_size(size as _); // usize -> u64
 
@@ -46,6 +60,12 @@ pub unsafe fn exit_process() -> ! {
     let _ = raw::exit_process();
 
     unreachable_unchecked()
+}
+
+pub unsafe fn r#break(reason: BreakReason, buffer_ptr: *const u8, size: usize) -> Result<()> {
+    raw::r#break(reason.bits, buffer_ptr as usize as _, size as _)
+        .result
+        .into_result(())
 }
 
 pub unsafe fn map_physical_memory((address, size): AddressRange) -> Result<()> {
