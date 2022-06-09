@@ -7,6 +7,7 @@
 mod raw;
 
 use bitflags::bitflags;
+use core::hint::unreachable_unchecked;
 use horizon_error::Result;
 
 pub type Address = *mut u8;
@@ -39,6 +40,12 @@ pub unsafe fn set_memory_permission(
     raw::set_memory_permission(address, size as _, permission.bits)
         .result
         .into_result(())
+}
+
+pub unsafe fn exit_process() -> ! {
+    let _ = raw::exit_process();
+
+    unreachable_unchecked()
 }
 
 pub unsafe fn map_physical_memory((address, size): AddressRange) -> Result<()> {

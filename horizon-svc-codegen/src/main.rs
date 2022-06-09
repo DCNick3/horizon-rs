@@ -115,11 +115,12 @@ struct Syscall {
     /// Name of the syscall
     pub name: String,
     /// HOS version requirements for this syscall
-    #[allow(unused)] // TODO: do come codegen for version requirements or smth
+    #[allow(unused)] // TODO: use this to codegen docs
     pub version_req: VersionReq,
     /// Info on in & out params for this syscall (as they are described on switchbrew)
     pub params_info: Option<ParamsInfo>,
     /// raw html from switchbrew in section for this syscall
+    #[allow(unused)] // TODO: use this to codegen docs
     pub raw_docs: Option<String>,
 }
 
