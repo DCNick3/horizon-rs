@@ -15,6 +15,9 @@ pub type Size = usize;
 pub type ThreadEntrypointFn = unsafe extern "C" fn(*mut u8) -> !;
 pub type AddressRange = (Address, Size);
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct RawHandle(pub u32);
+
 #[cfg(not(target_pointer_width = "64"))]
 compile_error!("Only 64-bit mode is supported");
 

@@ -1,9 +1,12 @@
 #![no_std]
 #![allow(clippy::missing_safety_doc)]
 
+mod hbl;
+mod init;
 mod relocate;
 mod rt_abort;
 
+use crate::hbl::AbiConfigEntry;
 use crate::relocate::{relocate_with_dyn, Dyn};
 use crate::rt_abort::{rt_abort, RtAbortReason};
 use core::arch::global_asm;
@@ -155,9 +158,8 @@ pub unsafe extern "C" fn __horizon_rt_relocate(aslr_base: u64, dynamic_section: 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn __horizon_rt_init(_x0: u64, _x1: u64, _saved_lr: u64) {
-    // TODO: implement this
-    rt_abort(RtAbortReason::NotImplemented)
+pub unsafe extern "C" fn __horizon_rt_init(x0: usize, x1: usize, saved_lr: usize) {
+    init::init(x0 as *const AbiConfigEntry, x1, saved_lr)
 }
 
 #[no_mangle]

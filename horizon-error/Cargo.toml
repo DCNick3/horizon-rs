@@ -13,5 +13,4 @@ compiler_builtins = { version = "0.1.70", optional = true }
 rustc-dep-of-std = [
     'core',
     'compiler_builtins',
-    'compiler_builtins/mem', # expose stuff like memcpy, memmove etc
 ]

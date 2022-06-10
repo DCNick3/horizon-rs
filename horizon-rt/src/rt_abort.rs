@@ -12,13 +12,16 @@ pub enum RtAbortReason {
     MissingDtEntry,
     RelaSizeMismatch,
     UnsupportedRelocationType,
+
+    // other stuff
+    NoMainThreadHandleInNsoEnv,
 }
 
 // const MODULE_CODE: u32 = 390; // TODO: need to to talk to people how to select this number
 
 /// This is a very low-level abort function
 #[inline(never)]
-pub fn rt_abort(reason: RtAbortReason) {
+pub fn rt_abort(reason: RtAbortReason) -> ! {
     // let code = ErrorCode::from_parts(MODULE_CODE, reason as u16 as u32);
 
     let reason_raw = reason as u16 as u32;
