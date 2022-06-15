@@ -6,13 +6,13 @@ use core::arch::asm;
 use horizon_error::ErrorCode;
 pub struct SetHeapSizeResult {
     pub result: ErrorCode,
-    pub heap_address: *mut u8,
+    pub heap_address: *const u8,
 }
 #[inline(always)]
 #[must_use]
 pub unsafe fn set_heap_size(size: u64) -> SetHeapSizeResult {
     let result: u32;
-    let heap_address: *mut u8;
+    let heap_address: *const u8;
     asm ! ("svc 0x01" , in ("x1") size , lateout ("w0") result , lateout ("x1") heap_address ,);
     SetHeapSizeResult {
         result: ErrorCode::new_unchecked(result),
@@ -25,7 +25,7 @@ pub struct SetMemoryPermissionResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn set_memory_permission(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> SetMemoryPermissionResult {
@@ -41,7 +41,7 @@ pub struct SetMemoryAttributeResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn set_memory_attribute(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     mask: u32,
     value: u32,
@@ -57,7 +57,11 @@ pub struct MapMemoryResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn map_memory(dst_address: *mut u8, src_address: *mut u8, size: u64) -> MapMemoryResult {
+pub unsafe fn map_memory(
+    dst_address: *const u8,
+    src_address: *const u8,
+    size: u64,
+) -> MapMemoryResult {
     let result: u32;
     asm ! ("svc 0x04" , in ("x0") dst_address , in ("x1") src_address , in ("x2") size , lateout ("w0") result ,);
     MapMemoryResult {
@@ -70,8 +74,8 @@ pub struct UnmapMemoryResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn unmap_memory(
-    dst_address: *mut u8,
-    src_address: *mut u8,
+    dst_address: *const u8,
+    src_address: *const u8,
     size: u64,
 ) -> UnmapMemoryResult {
     let result: u32;
@@ -86,7 +90,7 @@ pub struct QueryMemoryResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn query_memory(memory_info: u64, address: *mut u8) -> QueryMemoryResult {
+pub unsafe fn query_memory(memory_info: u64, address: *const u8) -> QueryMemoryResult {
     let result: u32;
     let page_info: u32;
     asm ! ("svc 0x06" , in ("x0") memory_info , in ("x2") address , lateout ("w0") result , lateout ("w1") page_info ,);
@@ -110,8 +114,8 @@ pub struct CreateThreadResult {
 #[must_use]
 pub unsafe fn create_thread(
     entry: u64,
-    thread_context: *mut u8,
-    stack_top: *mut u8,
+    thread_context: *const u8,
+    stack_top: *const u8,
     priority: u32,
     processor_id: u32,
 ) -> CreateThreadResult {
@@ -246,7 +250,7 @@ pub struct MapSharedMemoryResult {
 #[must_use]
 pub unsafe fn map_shared_memory(
     shared_memory_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> MapSharedMemoryResult {
@@ -263,7 +267,7 @@ pub struct UnmapSharedMemoryResult {
 #[must_use]
 pub unsafe fn unmap_shared_memory(
     shared_memory_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> UnmapSharedMemoryResult {
     let result: u32;
@@ -279,7 +283,7 @@ pub struct CreateTransferMemoryResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn create_transfer_memory(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> CreateTransferMemoryResult {
@@ -322,7 +326,7 @@ pub struct WaitSynchronizationResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn wait_synchronization(
-    handles_ptr: *mut u8,
+    handles_ptr: *const u8,
     handles_num: u32,
     timeout: u64,
 ) -> WaitSynchronizationResult {
@@ -353,7 +357,7 @@ pub struct ArbitrateLockResult {
 #[must_use]
 pub unsafe fn arbitrate_lock(
     thread_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     tag: u32,
 ) -> ArbitrateLockResult {
     let result: u32;
@@ -367,7 +371,7 @@ pub struct ArbitrateUnlockResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn arbitrate_unlock(address: *mut u8) -> ArbitrateUnlockResult {
+pub unsafe fn arbitrate_unlock(address: *const u8) -> ArbitrateUnlockResult {
     let result: u32;
     asm ! ("svc 0x1b" , in ("x0") address , lateout ("w0") result ,);
     ArbitrateUnlockResult {
@@ -380,8 +384,8 @@ pub struct WaitProcessWideKeyAtomicResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn wait_process_wide_key_atomic(
-    key_address: *mut u8,
-    tag_address: *mut u8,
+    key_address: *const u8,
+    tag_address: *const u8,
     tag: u32,
     timeout: u64,
 ) -> WaitProcessWideKeyAtomicResult {
@@ -396,7 +400,10 @@ pub struct SignalProcessWideKeyResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn signal_process_wide_key(address: *mut u8, value: u32) -> SignalProcessWideKeyResult {
+pub unsafe fn signal_process_wide_key(
+    address: *const u8,
+    value: u32,
+) -> SignalProcessWideKeyResult {
     let result: u32;
     asm ! ("svc 0x1d" , in ("x0") address , in ("w1") value , lateout ("w0") result ,);
     SignalProcessWideKeyResult {
@@ -419,7 +426,7 @@ pub struct ConnectToNamedPortResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn connect_to_named_port(port_name: *mut u8) -> ConnectToNamedPortResult {
+pub unsafe fn connect_to_named_port(port_name: *const u8) -> ConnectToNamedPortResult {
     let result: u32;
     let session_handle: u32;
     asm ! ("svc 0x1f" , in ("x1") port_name , lateout ("w0") result , lateout ("w1") session_handle ,);
@@ -458,7 +465,7 @@ pub struct SendSyncRequestWithUserBufferResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn send_sync_request_with_user_buffer(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     session_handle: u32,
 ) -> SendSyncRequestWithUserBufferResult {
@@ -475,7 +482,7 @@ pub struct SendAsyncRequestWithUserBufferResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn send_async_request_with_user_buffer(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     session_handle: u32,
 ) -> SendAsyncRequestWithUserBufferResult {
@@ -534,7 +541,7 @@ pub struct OutputDebugStringResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn output_debug_string(string: *mut u8, size: u64) -> OutputDebugStringResult {
+pub unsafe fn output_debug_string(string: *const u8, size: u64) -> OutputDebugStringResult {
     let result: u32;
     asm ! ("svc 0x27" , in ("x0") string , in ("x1") size , lateout ("w0") result ,);
     OutputDebugStringResult {
@@ -575,7 +582,7 @@ pub struct FlushDataCacheResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn flush_data_cache(address: *mut u8, size: u64) -> FlushDataCacheResult {
+pub unsafe fn flush_data_cache(address: *const u8, size: u64) -> FlushDataCacheResult {
     let result: u32;
     asm ! ("svc 0x2b" , in ("x0") address , in ("x1") size , lateout ("w0") result ,);
     FlushDataCacheResult {
@@ -587,7 +594,7 @@ pub struct MapPhysicalMemoryResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn map_physical_memory(address: *mut u8, size: u64) -> MapPhysicalMemoryResult {
+pub unsafe fn map_physical_memory(address: *const u8, size: u64) -> MapPhysicalMemoryResult {
     let result: u32;
     asm ! ("svc 0x2c" , in ("x0") address , in ("x1") size , lateout ("w0") result ,);
     MapPhysicalMemoryResult {
@@ -599,7 +606,7 @@ pub struct UnmapPhysicalMemoryResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn unmap_physical_memory(address: *mut u8, size: u64) -> UnmapPhysicalMemoryResult {
+pub unsafe fn unmap_physical_memory(address: *const u8, size: u64) -> UnmapPhysicalMemoryResult {
     let result: u32;
     asm ! ("svc 0x2d" , in ("x0") address , in ("x1") size , lateout ("w0") result ,);
     UnmapPhysicalMemoryResult {
@@ -738,7 +745,7 @@ pub struct WaitForAddressResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn wait_for_address(
-    address: *mut u8,
+    address: *const u8,
     arbitration_type: u32,
     value: u32,
     timeout: u64,
@@ -755,7 +762,7 @@ pub struct SignalToAddressResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn signal_to_address(
-    address: *mut u8,
+    address: *const u8,
     signal_type: u32,
     value: u32,
     num_to_signal: u32,
@@ -884,7 +891,7 @@ pub struct ReplyAndReceiveResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn reply_and_receive(
-    handles: *mut u8,
+    handles: *const u8,
     num_handles: u32,
     reply_target_session_handle: u32,
     timeout: u64,
@@ -904,9 +911,9 @@ pub struct ReplyAndReceiveWithUserBufferResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn reply_and_receive_with_user_buffer(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
-    handles: *mut u8,
+    handles: *const u8,
     num_handles: u32,
     reply_target_session_handle: u32,
     timeout: u64,
@@ -943,7 +950,7 @@ pub struct MapPhysicalMemoryUnsafeResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn map_physical_memory_unsafe(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> MapPhysicalMemoryUnsafeResult {
     let result: u32;
@@ -958,7 +965,7 @@ pub struct UnmapPhysicalMemoryUnsafeResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn unmap_physical_memory_unsafe(
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> UnmapPhysicalMemoryUnsafeResult {
     let result: u32;
@@ -985,7 +992,7 @@ pub struct CreateCodeMemoryResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn create_code_memory(address: *mut u8, size: u64) -> CreateCodeMemoryResult {
+pub unsafe fn create_code_memory(address: *const u8, size: u64) -> CreateCodeMemoryResult {
     let result: u32;
     let code_memory_handle: u32;
     asm ! ("svc 0x4b" , in ("x1") address , in ("x2") size , lateout ("w0") result , lateout ("w1") code_memory_handle ,);
@@ -1002,7 +1009,7 @@ pub struct ControlCodeMemoryResult {
 pub unsafe fn control_code_memory(
     code_memory_handle: u32,
     code_memory_operation: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> ControlCodeMemoryResult {
@@ -1079,7 +1086,7 @@ pub struct MapTransferMemoryResult {
 #[must_use]
 pub unsafe fn map_transfer_memory(
     transfer_memory_handle: u64,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> MapTransferMemoryResult {
@@ -1096,7 +1103,7 @@ pub struct UnmapTransferMemoryResult {
 #[must_use]
 pub unsafe fn unmap_transfer_memory(
     transfer_memory_handle: u64,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> UnmapTransferMemoryResult {
     let result: u32;
@@ -1131,7 +1138,7 @@ pub struct QueryPhysicalAddressResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn query_physical_address(virtual_address: *mut u8) -> QueryPhysicalAddressResult {
+pub unsafe fn query_physical_address(virtual_address: *const u8) -> QueryPhysicalAddressResult {
     let result: u32;
     let physical_memory_info_address: u64;
     let physical_memory_info_base_address: u64;
@@ -1146,13 +1153,13 @@ pub unsafe fn query_physical_address(virtual_address: *mut u8) -> QueryPhysicalA
 }
 pub struct QueryIoMappingResult {
     pub result: ErrorCode,
-    pub virtual_address: *mut u8,
+    pub virtual_address: *const u8,
 }
 #[inline(always)]
 #[must_use]
 pub unsafe fn query_io_mapping(io_address: u64, size: u64) -> QueryIoMappingResult {
     let result: u32;
-    let virtual_address: *mut u8;
+    let virtual_address: *const u8;
     asm ! ("svc 0x55" , in ("x1") io_address , in ("x2") size , lateout ("w0") result , lateout ("x1") virtual_address ,);
     QueryIoMappingResult {
         result: ErrorCode::new_unchecked(result),
@@ -1215,7 +1222,7 @@ pub struct MapDeviceAddressSpaceByForceResult {
 pub unsafe fn map_device_address_space_by_force(
     device_address_space_handle: u32,
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     device_address_space_size: u64,
     device_address_space_address: u64,
     memory_permission: u32,
@@ -1234,7 +1241,7 @@ pub struct MapDeviceAddressSpaceAlignedResult {
 pub unsafe fn map_device_address_space_aligned(
     device_address_space_handle: u32,
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     device_address_space_size: u64,
     device_address_space_address: u64,
     memory_permission: u32,
@@ -1254,7 +1261,7 @@ pub struct MapDeviceAddressSpaceResult {
 pub unsafe fn map_device_address_space(
     device_address_space_handle: u32,
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     device_address_space_size: u64,
     device_address_space_address: u64,
     memory_permission: u32,
@@ -1275,7 +1282,7 @@ pub struct UnmapDeviceAddressSpaceResult {
 pub unsafe fn unmap_device_address_space(
     device_address_space_handle: u32,
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     device_address_space_size: u64,
     device_address_space_address: u64,
 ) -> UnmapDeviceAddressSpaceResult {
@@ -1292,7 +1299,7 @@ pub struct InvalidateProcessDataCacheResult {
 #[must_use]
 pub unsafe fn invalidate_process_data_cache(
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> InvalidateProcessDataCacheResult {
     let result: u32;
@@ -1308,7 +1315,7 @@ pub struct StoreProcessDataCacheResult {
 #[must_use]
 pub unsafe fn store_process_data_cache(
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> StoreProcessDataCacheResult {
     let result: u32;
@@ -1324,7 +1331,7 @@ pub struct FlushProcessDataCacheResult {
 #[must_use]
 pub unsafe fn flush_process_data_cache(
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
     size: u64,
 ) -> FlushProcessDataCacheResult {
     let result: u32;
@@ -1391,7 +1398,7 @@ pub struct GetProcessListResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn get_process_list(
-    process_id_buffer: *mut u8,
+    process_id_buffer: *const u8,
     process_id_buffer_size: u32,
 ) -> GetProcessListResult {
     let result: u32;
@@ -1409,7 +1416,7 @@ pub struct GetThreadListResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn get_thread_list(
-    thread_id_buffer: *mut u8,
+    thread_id_buffer: *const u8,
     thread_id_buffer_size: u32,
     debug_handle: u32,
 ) -> GetThreadListResult {
@@ -1464,7 +1471,7 @@ pub struct QueryDebugProcessMemoryResult {
 pub unsafe fn query_debug_process_memory(
     memory_info: u64,
     debug_handle: u32,
-    address: *mut u8,
+    address: *const u8,
 ) -> QueryDebugProcessMemoryResult {
     let result: u32;
     let page_info: u32;
@@ -1480,9 +1487,9 @@ pub struct ReadDebugProcessMemoryResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn read_debug_process_memory(
-    memory_buffer_address: *mut u8,
+    memory_buffer_address: *const u8,
     debug_handle: u32,
-    src_address: *mut u8,
+    src_address: *const u8,
     size: u64,
 ) -> ReadDebugProcessMemoryResult {
     let result: u32;
@@ -1498,8 +1505,8 @@ pub struct WriteDebugProcessMemoryResult {
 #[must_use]
 pub unsafe fn write_debug_process_memory(
     debug_handle: u32,
-    memory_buffer_address: *mut u8,
-    dst_address: *mut u8,
+    memory_buffer_address: *const u8,
+    dst_address: *const u8,
     size: u64,
 ) -> WriteDebugProcessMemoryResult {
     let result: u32;
@@ -1589,7 +1596,7 @@ pub struct ManageNamedPortResult {
 }
 #[inline(always)]
 #[must_use]
-pub unsafe fn manage_named_port(name: *mut u8, max_sessions: u32) -> ManageNamedPortResult {
+pub unsafe fn manage_named_port(name: *const u8, max_sessions: u32) -> ManageNamedPortResult {
     let result: u32;
     let server_port_handle: u32;
     asm ! ("svc 0x71" , in ("x1") name , in ("w2") max_sessions , lateout ("w0") result , lateout ("w1") server_port_handle ,);
@@ -1620,7 +1627,7 @@ pub struct SetProcessMemoryPermissionResult {
 #[must_use]
 pub unsafe fn set_process_memory_permission(
     process_handle: u32,
-    addr: *mut u8,
+    addr: *const u8,
     size: u64,
     memory_permission: u32,
 ) -> SetProcessMemoryPermissionResult {
@@ -1636,9 +1643,9 @@ pub struct MapProcessMemoryResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn map_process_memory(
-    dst_address: *mut u8,
+    dst_address: *const u8,
     process_handle: u32,
-    src_address: *mut u8,
+    src_address: *const u8,
     size: u64,
 ) -> MapProcessMemoryResult {
     let result: u32;
@@ -1653,9 +1660,9 @@ pub struct UnmapProcessMemoryResult {
 #[inline(always)]
 #[must_use]
 pub unsafe fn unmap_process_memory(
-    dst_address: *mut u8,
+    dst_address: *const u8,
     process_handle: u32,
-    src_address: *mut u8,
+    src_address: *const u8,
     size: u64,
 ) -> UnmapProcessMemoryResult {
     let result: u32;
@@ -1673,7 +1680,7 @@ pub struct QueryProcessMemoryResult {
 pub unsafe fn query_process_memory(
     memory_info: u64,
     process_handle: u32,
-    address: *mut u8,
+    address: *const u8,
 ) -> QueryProcessMemoryResult {
     let result: u32;
     let page_info: u32;
@@ -1690,8 +1697,8 @@ pub struct MapProcessCodeMemoryResult {
 #[must_use]
 pub unsafe fn map_process_code_memory(
     process_handle: u32,
-    dst_address: *mut u8,
-    src_address: *mut u8,
+    dst_address: *const u8,
+    src_address: *const u8,
     size: u64,
 ) -> MapProcessCodeMemoryResult {
     let result: u32;
@@ -1707,8 +1714,8 @@ pub struct UnmapProcessCodeMemoryResult {
 #[must_use]
 pub unsafe fn unmap_process_code_memory(
     process_handle: u32,
-    dst_address: *mut u8,
-    src_address: *mut u8,
+    dst_address: *const u8,
+    src_address: *const u8,
     size: u64,
 ) -> UnmapProcessCodeMemoryResult {
     let result: u32;
@@ -1725,7 +1732,7 @@ pub struct CreateProcessResult {
 #[must_use]
 pub unsafe fn create_process(
     create_process_parameter: u64,
-    capabilities: *mut u8,
+    capabilities: *const u8,
     capabilities_num: u64,
 ) -> CreateProcessResult {
     let result: u32;

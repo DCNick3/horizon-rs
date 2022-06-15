@@ -211,14 +211,14 @@ impl ParamKind {
             ParamKind::Result => quote!(ErrorCode),
             ParamKind::Integer32 => quote!(u32),
             ParamKind::Integer64 => quote!(u64),
-            ParamKind::Pointer => quote!(*mut u8),
+            ParamKind::Pointer => quote!(*const u8),
         }
     }
     pub fn as_raw_tokens(&self) -> TokenStream {
         match self {
             ParamKind::Result | ParamKind::Integer32 => quote!(u32),
             ParamKind::Integer64 => quote!(u64),
-            ParamKind::Pointer => quote!(*mut u8),
+            ParamKind::Pointer => quote!(*const u8),
         }
     }
 }
@@ -566,12 +566,6 @@ fn codegen(syscalls: &Vec<Syscall>) -> anyhow::Result<String> {
                 .iter()
                 .map(|p| format!("{:?}", p.register).to_ascii_lowercase())
                 .collect::<Vec<_>>();
-
-            let params_struct_def = in_params.iter().map(|SyscallParam { kind, name, .. }| {
-                let ty = kind.as_tokens();
-                let name = make_ident(name);
-                quote!(#name: #ty)
-            });
 
             ts.extend([quote! {
                 pub struct #result_struct_name {

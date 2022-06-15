@@ -2,7 +2,13 @@
 
 //! Defines types for handling horizon errors & error codes
 
-use core::fmt::{Debug, Display};
+extern crate alloc;
+
+mod kernel;
+
+use core::fmt::{Debug, Formatter};
+
+pub use kernel::KernelErrorCode;
 
 const SUCCESS_VALUE: u32 = 0;
 const MODULE_BITS: u32 = 9;
@@ -114,7 +120,16 @@ impl ErrorCode {
     }
 }
 
-pub trait ErrorCodeModule: Debug + Display {
+impl Debug for ErrorCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> alloc::fmt::Result {
+        let module = self.get_module();
+        let desc = self.get_description();
+
+        write!(f, "{:4}-{:4}", module + 2000, desc)
+    }
+}
+
+pub trait ErrorCodeModule: Debug {
     const MODULE: u32;
 
     // this is allowed to panic when the desc code is unknown

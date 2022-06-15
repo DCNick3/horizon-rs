@@ -8,9 +8,11 @@ mod raw;
 
 use bitflags::bitflags;
 use core::hint::unreachable_unchecked;
+use core::sync::atomic::AtomicI32;
+use core::time::Duration;
 use horizon_error::Result;
 
-pub type Address = *mut u8;
+pub type Address = *const u8;
 pub type Size = usize;
 pub type ThreadEntrypointFn = unsafe extern "C" fn(*mut u8) -> !;
 pub type AddressRange = (Address, Size);
@@ -143,6 +145,20 @@ impl InfoType {
     }
 }
 
+#[repr(u32)]
+pub enum ArbitrationType {
+    WaitIfLessThan = 0,
+    DecrementAndWaitIfLessThan = 1,
+    WaitIfEqual = 2,
+}
+
+#[repr(u32)]
+pub enum SignalType {
+    Signal = 0,
+    SignalAndIncrementIfEqual = 1,
+    SignalAndModifyByWaitingCountIfEqual = 2,
+}
+
 pub unsafe fn set_heap_size(size: Size) -> Result<Address> {
     let res = raw::set_heap_size(size as _); // usize -> u64
 
@@ -189,4 +205,51 @@ pub unsafe fn unmap_physical_memory((address, size): AddressRange) -> Result<()>
     raw::unmap_physical_memory(address, size as _)
         .result
         .into_result(())
+}
+
+pub unsafe fn wait_for_address(
+    address: *const AtomicI32,
+    arbitration_type: ArbitrationType,
+    expected_value: i32,
+    timeout: Option<Duration>,
+) -> Result<()> {
+    // horizon treats any negative timeout as infinite, so transform None -> -1
+    let timeout_ns = timeout
+        .and_then(|timeout| {
+            // eh, we have to do a lossy conversion from Duration to nanoseconds
+            // it's fine though, only VERY long duration (100s of years) can hit the i64 limit
+            // treat those cases as "basically infinite" (return None which is "no limit")
+            let sub_nanos = timeout.subsec_nanos() as i64;
+            let full_secs: Option<i64> = timeout.as_secs().try_into().ok();
+
+            full_secs
+                .and_then(|v| v.checked_mul(1_000_000_000))
+                .and_then(|v| v.checked_add(sub_nanos))
+        })
+        .unwrap_or(-1);
+
+    raw::wait_for_address(
+        address as *const u8,
+        arbitration_type as u32,
+        expected_value as u32,
+        timeout_ns as u64,
+    )
+    .result
+    .into_result(())
+}
+
+pub unsafe fn signal_to_address(
+    address: *const AtomicI32,
+    signal_type: SignalType,
+    value: i32,
+    count: i32,
+) -> Result<()> {
+    raw::signal_to_address(
+        address as *const u8,
+        signal_type as u32,
+        value as u32,
+        count as u32,
+    )
+    .result
+    .into_result(())
 }
