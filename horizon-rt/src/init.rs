@@ -36,6 +36,32 @@ fn get_memory_map() -> Result<MemoryMap> {
     })
 }
 
+fn make_heap() -> Result<(*mut u8, usize)> {
+    let total_memory = horizon_svc::get_info(
+        InfoType::TotalMemorySize,
+        Some(CURRENT_PROCESS_PSEUDO_HANDLE),
+    )? as usize;
+    let used_memory = horizon_svc::get_info(
+        InfoType::UsedMemorySize,
+        Some(CURRENT_PROCESS_PSEUDO_HANDLE),
+    )? as usize;
+
+    const HEAP_GRANULARITY: usize = 2 * 1024 * 1024; // 2 MiB
+
+    // WTF (copied over from libnx)
+    let size = if total_memory > used_memory + HEAP_GRANULARITY {
+        // if we have enough memory - try to use all the free memory
+        (total_memory - used_memory - HEAP_GRANULARITY) & !(HEAP_GRANULARITY - 1)
+    } else {
+        // else allocate 32 MiB ???
+        16 * HEAP_GRANULARITY
+    };
+
+    let heap_addr = unsafe { horizon_svc::set_heap_size(size) }? as *mut u8;
+
+    Ok((heap_addr, size))
+}
+
 // SAFETY: only call it once
 pub unsafe fn init(
     maybe_abi_cfg_entries_ptr: *const AbiConfigEntry,
@@ -48,7 +74,7 @@ pub unsafe fn init(
             false => EnvironmentType::Nso,
         };
 
-    let environment = match environment_type {
+    let (environment, heap) = match environment_type {
         EnvironmentType::Nro => {
             // TODO: read the HBABI keys
 
@@ -58,11 +84,19 @@ pub unsafe fn init(
             if maybe_main_thread_handle == usize::MAX {
                 rt_abort(RtAbortReason::NoMainThreadHandleInNsoEnv);
             }
-            Environment {
-                environment_type,
-                main_thread_handle: maybe_main_thread_handle as u32,
-                hos_version: HorizonVersion::new(12, 1, 0),
-            }
+            let heap = match make_heap() {
+                Ok(heap) => heap,
+                Err(_) => rt_abort(RtAbortReason::MakeHeapFailed),
+            };
+
+            (
+                Environment {
+                    environment_type,
+                    main_thread_handle: maybe_main_thread_handle as u32,
+                    hos_version: HorizonVersion::new(12, 1, 0),
+                },
+                heap,
+            )
         }
     };
 
@@ -73,6 +107,28 @@ pub unsafe fn init(
         Err(_) => rt_abort(RtAbortReason::MemoryMapReadFailed),
     };
 
+    // TODO: BAD BAD BAD
+    // here we align the heap size to the nearest power of two, because this buddy allocator can't handle it
+    // I __think__ though that the allocator can be adapted to support such sizes, it's just hard to implement
+    // This usually means that we will be limited to 2 GiB of heap
+    let heap = {
+        let (addr, size): (*mut u8, usize) = heap;
+
+        // min size is 4096 = 2 ** 12
+        // but in the worst case the size_power > size will trigger immediately and the size_power will be divided by two
+        // so the resulting size will always be >= 4096
+        let mut size_power: usize = 1 << 13;
+        let size = loop {
+            if size_power > size {
+                break size_power / 2;
+            }
+            size_power *= 2;
+        };
+
+        (addr, size)
+    };
+
     horizon_global::environment::init(environment);
     horizon_global::virtual_memory::init(memory_map);
+    horizon_global::heap::init(heap.0, heap.1);
 }

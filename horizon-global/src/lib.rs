@@ -3,6 +3,7 @@
 // TODO: add a feature that will use global values from std instead of defining them (when they will get exported from std)
 
 pub mod environment;
+pub mod heap;
 pub mod virtual_memory;
 
 #[no_mangle]

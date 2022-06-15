@@ -16,6 +16,7 @@ pub enum RtAbortReason {
     // other stuff
     NoMainThreadHandleInNsoEnv,
     MemoryMapReadFailed,
+    MakeHeapFailed,
 }
 
 // const MODULE_CODE: u32 = 390; // TODO: need to to talk to people how to select this number

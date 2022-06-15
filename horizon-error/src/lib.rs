@@ -2,8 +2,6 @@
 
 //! Defines types for handling horizon errors & error codes
 
-extern crate alloc;
-
 mod kernel;
 
 use core::fmt::{Debug, Formatter};
@@ -121,7 +119,7 @@ impl ErrorCode {
 }
 
 impl Debug for ErrorCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> alloc::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let module = self.get_module();
         let desc = self.get_description();
 

@@ -14,7 +14,7 @@ pub struct Mutex<T: ?Sized> {
 unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
 unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
 
-pub struct MutexGuard<'a, T: ?Sized + 'a> {
+pub struct MutexGuard<'a, T: ?Sized> {
     lock: &'a Mutex<T>,
 }
 
