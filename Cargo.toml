@@ -5,6 +5,6 @@ members = [
     "horizon-svc",
     "horizon-svc-codegen",
     "horizon-rt",
-    "horizon-env",
+    "horizon-global",
 ]
 

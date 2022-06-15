@@ -1,8 +1,4 @@
-#![no_std]
-
 use core::mem::MaybeUninit;
-
-use horizon_svc::RawHandle;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum EnvironmentType {
@@ -30,7 +26,7 @@ impl HorizonVersion {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Environment {
     pub environment_type: EnvironmentType,
-    pub main_thread_handle: RawHandle,
+    pub main_thread_handle: u32,
     pub hos_version: HorizonVersion,
 }
 
@@ -38,14 +34,15 @@ static mut ENVIRONMENT: MaybeUninit<Environment> = MaybeUninit::uninit();
 
 /// # Safety
 ///
-/// Must be called only once
-/// Must be called before any calls to [get_environment]
+/// Must be called exactly once (you HAVE to call it before using get)
+/// Must be called before any calls to [get]
 /// It's usually called by horizon-rt in early process initialization, so usually you don't call this
 pub unsafe fn init(environment: Environment) {
     ENVIRONMENT.write(environment);
 }
 
-pub fn get_environment() -> &'static Environment {
-    // SAFETY: the ENVIRONMENT var is not mutated after calls to get_environment
+/// This is safe only when [init] was called
+pub fn get() -> &'static Environment {
+    // SAFETY: the [ENVIRONMENT] var should've been initialized via [init] and not modified otherwise
     unsafe { ENVIRONMENT.assume_init_ref() }
 }

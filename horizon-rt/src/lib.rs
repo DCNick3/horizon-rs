@@ -1,3 +1,7 @@
+//! Crate that implements the low-level startup code - the first thing that runs in your process
+//!
+//! You probably don't want to directly depend on it, libstd already should do this for you
+
 #![no_std]
 #![allow(clippy::missing_safety_doc)]
 
