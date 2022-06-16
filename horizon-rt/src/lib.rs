@@ -9,6 +9,7 @@ mod hbl;
 mod init;
 mod relocate;
 mod rt_abort;
+mod tls;
 
 use crate::hbl::AbiConfigEntry;
 use crate::relocate::{relocate_with_dyn, Dyn};
@@ -127,6 +128,16 @@ global_asm! {
      mov  x2, x27 // saved lr
      bl   __horizon_rt_init",
 
+    // restore LR to be ~0
+    "mov lr, x24",
+
+    // load addr of TLS storage for the main thread
+    "adrp x0, __main_thread_tls_start
+     add  x0, x0, #:lo12:__main_thread_tls_start",
+
+    // init TLS for main thread
+    "bl __horizon_rt_init_tls",
+
     // now we are gonna jump to the main function
 
     // make it return to __horizon_rt_exit
@@ -150,9 +161,9 @@ pub unsafe extern "C" fn __horizon_rt_exception_entry() {
     rt_abort(RtAbortReason::NotImplemented)
 }
 
-// called to parse the .dynamic section and perform relocations
-// it's very important that this function does not need any relocations applied to succeed, otherwise we are in trouble :P
-// _hopefully_ it doesn't touch any globals, so it should  be fine
+/// called to parse the .dynamic section and perform relocations
+/// it's very important that this function does not need any relocations applied to succeed, otherwise we are in trouble :P
+/// _hopefully_ it doesn't touch any globals, so it should  be fine
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_relocate(aslr_base: u64, dynamic_section: u64) {
     relocate_with_dyn(
@@ -161,11 +172,19 @@ pub unsafe extern "C" fn __horizon_rt_relocate(aslr_base: u64, dynamic_section: 
     )
 }
 
+/// Initialize TLS for current thread
+#[no_mangle]
+pub unsafe extern "C" fn __horizon_rt_init_tls(tls_storage_addr: *mut u8) {
+    tls::init(tls_storage_addr);
+}
+
+/// Perform most of initialization for horizon-global
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_init(x0: usize, x1: usize, saved_lr: usize) {
     init::init(x0 as *const AbiConfigEntry, x1, saved_lr)
 }
 
+/// Clean up the process & return to loader/exit process (depending on the env)
 #[no_mangle]
 pub unsafe extern "C" fn __horizon_rt_exit(_exit_code: u32) {
     // TODO: implement this
