@@ -15,6 +15,7 @@ use crate::hbl::AbiConfigEntry;
 use crate::relocate::{relocate_with_dyn, Dyn};
 use crate::rt_abort::{rt_abort, RtAbortReason};
 use core::arch::global_asm;
+use horizon_global::environment::EnvironmentType;
 
 // define _start
 // what happens at the start of a file
@@ -113,6 +114,11 @@ global_asm! {
      adrp x9, __HORIZON_RT_STACK_TOP
      str  x8, [x9, #:lo12:__HORIZON_RT_STACK_TOP]",
 
+    // same for the lr
+    "mov x8, x29
+     adrp x9, __HORIZON_RT_SAVED_LR
+     str  x8, [x9, #:lo12:__HORIZON_RT_SAVED_LR]",
+
     // Parse ELF .dynamic section (which applies relocations to our module)
     "adr  x0, _start    // get aslr base
      ldr  w1, [x28, #4] // pointer to .dynamic section from MOD0
@@ -151,8 +157,13 @@ global_asm! {
      .size __horizon_rt_entry, . - __horizon_rt_entry",
 }
 
+/// Stores the stack top address when we started the runtime
+/// Used to be able to correctly return to homebrew loader on exit
 #[no_mangle]
 static mut __HORIZON_RT_STACK_TOP: u64 = 0;
+
+#[no_mangle]
+static mut __HORIZON_RT_SAVED_LR: u64 = 0;
 
 // called when HOS calls our entrypoint with an exception
 #[no_mangle]
@@ -186,9 +197,13 @@ pub unsafe extern "C" fn __horizon_rt_init(x0: usize, x1: usize, saved_lr: usize
 
 /// Clean up the process & return to loader/exit process (depending on the env)
 #[no_mangle]
-pub unsafe extern "C" fn __horizon_rt_exit(_exit_code: u32) {
-    // TODO: implement this
-    rt_abort(RtAbortReason::NotImplemented)
+pub unsafe extern "C" fn __horizon_rt_exit(_exit_code: u32) -> ! {
+    if horizon_global::environment::get().environment_type == EnvironmentType::Nro {
+        // TODO: return to the loader
+        rt_abort(RtAbortReason::NotImplemented)
+    } else {
+        horizon_svc::exit_process()
+    }
 }
 
 // define the MOD0 header
