@@ -21,7 +21,7 @@ pub type AddressRange = (Address, Size);
 pub struct RawHandle(pub u32);
 
 pub const CURRENT_PROCESS_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8001);
-pub const CURRENT_THREAD_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8001);
+pub const CURRENT_THREAD_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8000);
 
 #[cfg(not(target_pointer_width = "64"))]
 compile_error!("Only 64-bit mode is supported");
@@ -184,6 +184,11 @@ pub unsafe fn r#break(reason: BreakReason, buffer_ptr: *const u8, size: usize) -
     raw::r#break(reason.bits, buffer_ptr as usize as _, size as _)
         .result
         .into_result(())
+}
+
+pub fn output_debug_string(message: &[u8]) {
+    // this svc has a return type, but it can be ignored I think
+    let _ = unsafe { raw::output_debug_string(message.as_ptr(), message.len() as u64) };
 }
 
 pub fn get_info(info_type: InfoType, handle: Option<RawHandle>) -> Result<u64> {
