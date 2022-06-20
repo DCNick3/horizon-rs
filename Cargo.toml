@@ -8,5 +8,6 @@ members = [
     "horizon-rt",
     "horizon-global",
     "horizon-sync",
+    "horizon-ipc",
 ]
 
