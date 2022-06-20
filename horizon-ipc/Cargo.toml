@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 horizon-error = { path = "../horizon-error" }
+horizon-svc = { path = "../horizon-svc" }

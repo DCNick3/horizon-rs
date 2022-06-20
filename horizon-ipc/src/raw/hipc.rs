@@ -82,6 +82,8 @@ where
     }
 }
 pub type u32_ = super::c_types::c_uint;
+pub type u16_ = super::c_types::c_ushort;
+pub type u8_ = super::c_types::c_uchar;
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Debug, Copy, Clone)]
@@ -90,55 +92,55 @@ pub struct HipcHeader {
 }
 impl HipcHeader {
     #[inline]
-    pub fn type_(&self) -> u32_ {
-        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 16u8) as u32) }
+    pub fn type_(&self) -> u16_ {
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 16u8) as u16) }
     }
     #[inline]
-    pub fn set_type(&mut self, val: u32_) {
+    pub fn set_type(&mut self, val: u16_) {
         unsafe {
-            let val: u32 = ::core::mem::transmute(val);
+            let val: u16 = ::core::mem::transmute(val);
             self._bitfield_1.set(0usize, 16u8, val as u64)
         }
     }
     #[inline]
-    pub fn num_send_statics(&self) -> u32_ {
+    pub fn num_in_pointers(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(16usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_num_send_statics(&mut self, val: u32_) {
+    pub fn set_num_in_pointers(&mut self, val: u32_) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(16usize, 4u8, val as u64)
         }
     }
     #[inline]
-    pub fn num_send_buffers(&self) -> u32_ {
+    pub fn num_in_map_aliases(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(20usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_num_send_buffers(&mut self, val: u32_) {
+    pub fn set_num_in_map_aliases(&mut self, val: u32_) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(20usize, 4u8, val as u64)
         }
     }
     #[inline]
-    pub fn num_recv_buffers(&self) -> u32_ {
+    pub fn num_out_map_aliases(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(24usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_num_recv_buffers(&mut self, val: u32_) {
+    pub fn set_num_out_map_aliases(&mut self, val: u32_) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(24usize, 4u8, val as u64)
         }
     }
     #[inline]
-    pub fn num_exch_buffers(&self) -> u32_ {
+    pub fn num_inout_map_aliases(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(28usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_num_exch_buffers(&mut self, val: u32_) {
+    pub fn set_num_inout_map_aliases(&mut self, val: u32_) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(28usize, 4u8, val as u64)
@@ -156,11 +158,11 @@ impl HipcHeader {
         }
     }
     #[inline]
-    pub fn recv_static_mode(&self) -> u32_ {
+    pub fn out_pointer_mode(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(42usize, 4u8) as u32) }
     }
     #[inline]
-    pub fn set_recv_static_mode(&mut self, val: u32_) {
+    pub fn set_out_pointer_mode(&mut self, val: u32_) {
         unsafe {
             let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(42usize, 4u8, val as u64)
@@ -201,13 +203,13 @@ impl HipcHeader {
     }
     #[inline]
     pub fn new_bitfield_1(
-        type_: u32_,
-        num_send_statics: u32_,
-        num_send_buffers: u32_,
-        num_recv_buffers: u32_,
-        num_exch_buffers: u32_,
+        type_: u16_,
+        num_in_pointers: u32_,
+        num_in_map_aliases: u32_,
+        num_out_map_aliases: u32_,
+        num_inout_map_aliases: u32_,
         num_data_words: u32_,
-        recv_static_mode: u32_,
+        out_pointer_mode: u32_,
         padding: u32_,
         recv_list_offset: u32_,
         has_special_header: u32_,
@@ -215,32 +217,33 @@ impl HipcHeader {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 8usize], u16> =
             Default::default();
         __bindgen_bitfield_unit.set(0usize, 16u8, {
-            let type_: u32 = unsafe { ::core::mem::transmute(type_) };
+            let type_: u16 = unsafe { ::core::mem::transmute(type_) };
             type_ as u64
         });
         __bindgen_bitfield_unit.set(16usize, 4u8, {
-            let num_send_statics: u32 = unsafe { ::core::mem::transmute(num_send_statics) };
-            num_send_statics as u64
+            let num_in_pointers: u32 = unsafe { ::core::mem::transmute(num_in_pointers) };
+            num_in_pointers as u64
         });
         __bindgen_bitfield_unit.set(20usize, 4u8, {
-            let num_send_buffers: u32 = unsafe { ::core::mem::transmute(num_send_buffers) };
-            num_send_buffers as u64
+            let num_in_map_aliases: u32 = unsafe { ::core::mem::transmute(num_in_map_aliases) };
+            num_in_map_aliases as u64
         });
         __bindgen_bitfield_unit.set(24usize, 4u8, {
-            let num_recv_buffers: u32 = unsafe { ::core::mem::transmute(num_recv_buffers) };
-            num_recv_buffers as u64
+            let num_out_map_aliases: u32 = unsafe { ::core::mem::transmute(num_out_map_aliases) };
+            num_out_map_aliases as u64
         });
         __bindgen_bitfield_unit.set(28usize, 4u8, {
-            let num_exch_buffers: u32 = unsafe { ::core::mem::transmute(num_exch_buffers) };
-            num_exch_buffers as u64
+            let num_inout_map_aliases: u32 =
+                unsafe { ::core::mem::transmute(num_inout_map_aliases) };
+            num_inout_map_aliases as u64
         });
         __bindgen_bitfield_unit.set(32usize, 10u8, {
             let num_data_words: u32 = unsafe { ::core::mem::transmute(num_data_words) };
             num_data_words as u64
         });
         __bindgen_bitfield_unit.set(42usize, 4u8, {
-            let recv_static_mode: u32 = unsafe { ::core::mem::transmute(recv_static_mode) };
-            recv_static_mode as u64
+            let out_pointer_mode: u32 = unsafe { ::core::mem::transmute(out_pointer_mode) };
+            out_pointer_mode as u64
         });
         __bindgen_bitfield_unit.set(46usize, 6u8, {
             let padding: u32 = unsafe { ::core::mem::transmute(padding) };
@@ -338,11 +341,11 @@ impl HipcSpecialHeader {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct HipcStaticDescriptor {
+pub struct HipcInPointerBufferDescriptor {
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize], u16>,
     pub address_low: u32_,
 }
-impl HipcStaticDescriptor {
+impl HipcInPointerBufferDescriptor {
     #[inline]
     pub fn index(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 6u8) as u32) }
@@ -417,12 +420,12 @@ impl HipcStaticDescriptor {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct HipcBufferDescriptor {
+pub struct HipcMapAliasBufferDescriptor {
     pub size_low: u32_,
     pub address_low: u32_,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize], u32>,
 }
-impl HipcBufferDescriptor {
+impl HipcMapAliasBufferDescriptor {
     #[inline]
     pub fn mode(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 2u8) as u32) }
@@ -497,11 +500,11 @@ impl HipcBufferDescriptor {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct HipcRecvListEntry {
+pub struct HipcOutPointerBufferDescriptor {
     pub address_low: u32_,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize], u16>,
 }
-impl HipcRecvListEntry {
+impl HipcOutPointerBufferDescriptor {
     #[inline]
     pub fn address_high(&self) -> u32_ {
         unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 16u8) as u32) }

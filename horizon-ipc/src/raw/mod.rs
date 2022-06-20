@@ -7,5 +7,6 @@ mod c_types;
 
 #[allow(dead_code)]
 pub mod cmif;
-#[allow(non_camel_case_types, dead_code)]
+#[allow(non_camel_case_types, dead_code, clippy::too_many_arguments)]
 pub mod hipc;
+mod hipc_conv;
