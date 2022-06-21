@@ -180,6 +180,43 @@ pub unsafe fn exit_process() -> ! {
     unreachable_unchecked()
 }
 
+pub fn close_handle(handle: RawHandle) -> Result<()> {
+    unsafe { raw::close_handle(handle.0).result.into_result(()) }
+}
+
+/// SAFETY: port_name should be zero-terminated
+pub unsafe fn connect_to_named_port(port_name: &[u8]) -> Result<RawHandle> {
+    debug_assert_eq!(
+        port_name[port_name.len() - 1],
+        0,
+        "port_name should be zero-terminated"
+    );
+
+    let r = raw::connect_to_named_port(port_name.as_ptr());
+
+    r.result.into_result(RawHandle(r.session_handle))
+}
+
+pub fn send_sync_request(session_handle: RawHandle) -> Result<()> {
+    unsafe { raw::send_sync_request(session_handle.0) }
+        .result
+        .into_result(())
+}
+
+/// [buffer] must be 0x1000-aligned
+/// NOTICE: yuzu does not support this svc yet =(
+pub fn send_sync_request_with_user_buffer(buffer: &[u8], session_handle: RawHandle) -> Result<()> {
+    unsafe {
+        raw::send_sync_request_with_user_buffer(
+            buffer.as_ptr(),
+            buffer.len() as u64,
+            session_handle.0,
+        )
+    }
+    .result
+    .into_result(())
+}
+
 pub unsafe fn r#break(reason: BreakReason, buffer_ptr: *const u8, size: usize) -> Result<()> {
     raw::r#break(reason.bits, buffer_ptr as usize as _, size as _)
         .result

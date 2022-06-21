@@ -1,7 +1,9 @@
 #![no_std]
 
-mod cmif;
-mod hipc;
-mod sm;
-mod raw;
-mod conv_traits;
+extern crate alloc;
+
+pub mod cmif;
+pub mod conv_traits;
+pub mod hipc;
+pub mod raw;
+pub mod sm;

@@ -42,16 +42,19 @@ pub enum Buffer<'a> {
     MapAliasInOut(MapAliasBufferMode, MutBuffer<'a>),
 }
 
-pub struct Request<'a, 'b, P: WriteAsBytes> {
-    pub ty: u16,
-    pub send_pid: bool,
+pub trait HipcPayload: WriteAsBytes {
+    fn get_type(&self) -> u16;
+}
+
+pub struct Request<'a, 'b, P: HipcPayload> {
+    pub send_pid: Option<u64>,
     pub buffers: &'b [Buffer<'a>],
     pub copy_handles: &'b [RawHandle],
     pub move_handles: &'b [RawHandle],
     pub payload: &'b P,
 }
 
-impl<'a, 'b, P: WriteAsBytes> WriteAsBytes for Request<'a, 'b, P> {
+impl<'a, 'b, P: HipcPayload> WriteAsBytes for Request<'a, 'b, P> {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
         let mut in_pointers_count = 0;
         let mut out_pointers_count = 0;
@@ -70,8 +73,9 @@ impl<'a, 'b, P: WriteAsBytes> WriteAsBytes for Request<'a, 'b, P> {
             }
         }
 
-        let has_special_header =
-            !self.move_handles.is_empty() || !self.copy_handles.is_empty() || self.send_pid;
+        let has_special_header = !self.move_handles.is_empty()
+            || !self.copy_handles.is_empty()
+            || self.send_pid.is_some();
 
         let payload_size = self.payload.size();
 
@@ -88,7 +92,7 @@ impl<'a, 'b, P: WriteAsBytes> WriteAsBytes for Request<'a, 'b, P> {
 
         dest.write(&HipcHeader {
             _bitfield_1: HipcHeader::new_bitfield_1(
-                self.ty,
+                self.payload.get_type(),
                 in_pointers_count,
                 in_map_aliases_count,
                 out_map_aliases_count,
@@ -118,12 +122,24 @@ impl<'a, 'b, P: WriteAsBytes> WriteAsBytes for Request<'a, 'b, P> {
         if has_special_header {
             dest.write(&HipcSpecialHeader {
                 _bitfield_1: HipcSpecialHeader::new_bitfield_1(
-                    self.send_pid as _,
+                    self.send_pid.is_some() as _,
                     self.copy_handles.len() as _,
                     self.move_handles.len() as _,
                     0,
                 ),
-            })
+            });
+
+            if let Some(pid) = &self.send_pid {
+                dest.write(pid)
+            }
+
+            // TODO: allow sending 0 as a handle
+            for handle in self.copy_handles {
+                dest.write(&handle.0)
+            }
+            for handle in self.move_handles {
+                dest.write(&handle.0)
+            }
         }
 
         // descriptors go in order:
@@ -178,8 +194,21 @@ impl<'a, 'b, P: WriteAsBytes> WriteAsBytes for Request<'a, 'b, P> {
             }
         }
 
+        // we need to align stuff to 16 bytes because ABI
+        let aligned = dest.align(16);
         // payload
         dest.write(self.payload);
+
+        // for some reason we have to insert padding at two places: before and after the payload
+        // they, in sum, should be 16 bytes
+        // (WTF man)
+        let zeroes = [0u8; 16];
+        dest.write_bytes(&zeroes[..aligned]);
+
+        // TODO: if we had supported them, sizes of buffers that are HipcAutoSelect would go here
+        // we don't implement them currently, but they are used somewhat heavily across the codebase
+        // so we probably should implement them
+        // although I think those are CMIF thing??? Dunno, need to research a bit
 
         // out_pointers
         for buffer in self.buffers.iter() {
