@@ -1,6 +1,7 @@
 mod ipc_parse;
 
 use crate::ipc_parse::IpcFile;
+use app_dirs2::{AppDataType, AppInfo};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::{Client, IntoUrl};
@@ -11,6 +12,11 @@ use scraper::{Html, Selector};
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
+
+const APP_INFO: AppInfo = AppInfo {
+    name: "horizon-ipcdef-codegen",
+    author: "DCNick3",
+};
 
 const NINUPDATES_BASE_URL: &str = "https://yls8.mtheall.com/ninupdates";
 
@@ -27,7 +33,13 @@ static REQWEST_CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
     ClientBuilder::new(Client::new())
         .with(Cache {
             mode: CacheMode::Default,
-            cache_manager: CACacheManager::default(),
+            cache_manager: CACacheManager {
+                path: app_dirs2::app_dir(AppDataType::UserCache, &APP_INFO, "reqwest-cacache")
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            },
         })
         .build()
 });
