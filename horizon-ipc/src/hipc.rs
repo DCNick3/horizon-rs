@@ -1,4 +1,4 @@
-use crate::conv_traits::{WriteAsBytes, Writer};
+use crate::conv_traits::{ReadFromBytes, Reader, WriteAsBytes, Writer};
 use crate::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
@@ -42,11 +42,11 @@ pub enum Buffer<'a> {
     MapAliasInOut(MapAliasBufferMode, MutBuffer<'a>),
 }
 
-pub trait HipcPayload: WriteAsBytes {
+pub trait HipcPayloadIn: WriteAsBytes {
     fn get_type(&self) -> u16;
 }
 
-pub struct Request<'a, 'b, P: HipcPayload> {
+pub struct Request<'a, 'b, P: HipcPayloadIn> {
     pub send_pid: Option<u64>,
     pub buffers: &'b [Buffer<'a>],
     pub copy_handles: &'b [RawHandle],
@@ -54,7 +54,7 @@ pub struct Request<'a, 'b, P: HipcPayload> {
     pub payload: &'b P,
 }
 
-impl<'a, 'b, P: HipcPayload> WriteAsBytes for Request<'a, 'b, P> {
+impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
         let mut in_pointers_count = 0;
         let mut out_pointers_count = 0;
@@ -194,27 +194,82 @@ impl<'a, 'b, P: HipcPayload> WriteAsBytes for Request<'a, 'b, P> {
             }
         }
 
-        // we need to align stuff to 16 bytes because ABI
-        let aligned = dest.align(16);
         // payload
         dest.write(self.payload);
-
-        // for some reason we have to insert padding at two places: before and after the payload
-        // they, in sum, should be 16 bytes
-        // (WTF man)
-        let zeroes = [0u8; 16];
-        dest.write_bytes(&zeroes[..aligned]);
-
-        // TODO: if we had supported them, sizes of buffers that are HipcAutoSelect would go here
-        // we don't implement them currently, but they are used somewhat heavily across the codebase
-        // so we probably should implement them
-        // although I think those are CMIF thing??? Dunno, need to research a bit
 
         // out_pointers
         for buffer in self.buffers.iter() {
             if let Buffer::PointerOut(buf) = buffer {
                 dest.write(&HipcOutPointerBufferDescriptor::new(buf.address, buf.size))
             }
+        }
+    }
+}
+
+pub struct Response<'d, P: ReadFromBytes<'d>> {
+    // TODO: static/pointer recv descriptors
+    pid: Option<u64>,
+    move_handles: &'d [u8],
+    copy_handles: &'d [u8],
+    payload: P,
+}
+
+impl<'d, P: ReadFromBytes<'d>> Response<'d, P> {
+    pub fn payload(&self) -> &P {
+        &self.payload
+    }
+}
+
+impl<'d, P: ReadFromBytes<'d>> ReadFromBytes<'d> for Response<'d, P> {
+    fn read_from_bytes(src: &mut (impl Reader<'d> + ?Sized)) -> Self {
+        let header = src.read::<HipcHeader>();
+
+        debug_assert_eq!(header.type_(), 0);
+
+        let num_pointer_desc = header.num_in_pointers();
+
+        debug_assert_eq!(header.num_in_map_aliases(), 0);
+        debug_assert_eq!(header.num_out_map_aliases(), 0);
+        debug_assert_eq!(header.num_inout_map_aliases(), 0);
+
+        let payload_size = header.num_data_words() * 4;
+
+        debug_assert_eq!(header.out_pointer_mode(), 0);
+
+        let has_special_header = header.has_special_header() != 0;
+
+        let (pid, copy_handles, move_handles) = if has_special_header {
+            let special_header = src.read::<HipcSpecialHeader>();
+
+            let send_pid = special_header.send_pid() != 0;
+            let num_copy_handles = special_header.num_copy_handles();
+            let num_move_handles = special_header.num_move_handles();
+
+            let pid = if send_pid {
+                Some(src.read::<u64>())
+            } else {
+                None
+            };
+
+            let copy_handles = src.read_bytes((num_copy_handles * 4) as _);
+            let move_handles = src.read_bytes((num_move_handles * 4) as _);
+
+            (pid, copy_handles, move_handles)
+        } else {
+            (None, [].as_slice(), [].as_slice())
+        };
+
+        if num_pointer_desc != 0 {
+            todo!("Reading pointer descriptors from the response")
+        }
+
+        let payload = src.read::<P>();
+
+        Self {
+            pid,
+            move_handles,
+            copy_handles,
+            payload,
         }
     }
 }

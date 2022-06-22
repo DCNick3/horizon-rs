@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 pub trait Writer {
     fn write_bytes(&mut self, data: &[u8]);
     /// Align the buffer to [alignment] bytes, return number of alignment bytes inserted
@@ -8,7 +10,18 @@ pub trait Writer {
     }
 }
 
-struct CountingWriter(usize);
+pub trait Reader<'d> {
+    fn read_bytes(&mut self, size: usize) -> &'d [u8];
+
+    /// Align the buffer to [alignment] bytes, return number of alignment bytes inserted
+    fn align(&mut self, alignment: usize) -> usize;
+
+    fn read<T: ReadFromBytes<'d>>(&mut self) -> T {
+        T::read_from_bytes(self)
+    }
+}
+
+pub struct CountingWriter(usize);
 
 impl Writer for CountingWriter {
     #[inline]
@@ -45,6 +58,41 @@ impl Writer for Vec<u8> {
     }
 }
 
+pub struct SliceReader<'d> {
+    leftover: &'d [u8],
+    pos: usize,
+}
+
+impl<'d> SliceReader<'d> {
+    pub fn new(slice: &'d [u8]) -> Self {
+        Self {
+            pos: 0,
+            leftover: slice,
+        }
+    }
+}
+
+impl<'d> Reader<'d> for SliceReader<'d> {
+    fn read_bytes(&mut self, size: usize) -> &'d [u8] {
+        let (ret, left) = self.leftover.split_at(size);
+
+        self.leftover = left;
+        self.pos += size;
+
+        ret
+    }
+
+    fn align(&mut self, alignment: usize) -> usize {
+        let new_pos = ((self.pos + alignment - 1) / alignment) * alignment;
+        let need_align = new_pos - self.pos;
+
+        self.leftover = &self.leftover[need_align..];
+        self.pos = new_pos;
+
+        need_align
+    }
+}
+
 pub trait WriteAsBytes {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized));
 
@@ -56,6 +104,10 @@ pub trait WriteAsBytes {
 
         writer.0
     }
+}
+
+pub trait ReadFromBytes<'d> {
+    fn read_from_bytes(src: &mut (impl Reader<'d> + ?Sized)) -> Self;
 }
 
 macro_rules! as_bytes_impl_transmute {
@@ -72,8 +124,23 @@ macro_rules! as_bytes_impl_transmute {
     };
 }
 
-use alloc::vec::Vec;
+macro_rules! from_bytes_impl_transmute {
+    ($t:ty) => {
+        impl<'d> crate::conv_traits::ReadFromBytes<'d> for $t {
+            fn read_from_bytes(src: &mut (impl crate::conv_traits::Reader<'d> + ?Sized)) -> Self {
+                const SIZE: usize = ::core::mem::size_of::<$t>();
+
+                let buffer: &'d [u8] = crate::conv_traits::Reader::read_bytes(src, SIZE);
+                let buffer = <&[u8; SIZE]>::try_from(buffer).unwrap();
+
+                unsafe { ::core::mem::transmute_copy(buffer) }
+            }
+        }
+    };
+}
+
 pub(crate) use as_bytes_impl_transmute;
+pub(crate) use from_bytes_impl_transmute;
 
 as_bytes_impl_transmute!(u8);
 as_bytes_impl_transmute!(u16);
@@ -86,3 +153,15 @@ as_bytes_impl_transmute!(i32);
 as_bytes_impl_transmute!(i64);
 
 as_bytes_impl_transmute!(());
+
+from_bytes_impl_transmute!(u8);
+from_bytes_impl_transmute!(u16);
+from_bytes_impl_transmute!(u32);
+from_bytes_impl_transmute!(u64);
+
+from_bytes_impl_transmute!(i8);
+from_bytes_impl_transmute!(i16);
+from_bytes_impl_transmute!(i32);
+from_bytes_impl_transmute!(i64);
+
+from_bytes_impl_transmute!(());

@@ -2,7 +2,7 @@ use super::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
 };
-use crate::conv_traits::as_bytes_impl_transmute;
+use crate::conv_traits::{as_bytes_impl_transmute, from_bytes_impl_transmute};
 use crate::hipc::MapAliasBufferMode;
 
 as_bytes_impl_transmute!(HipcHeader);
@@ -10,6 +10,12 @@ as_bytes_impl_transmute!(HipcSpecialHeader);
 as_bytes_impl_transmute!(HipcInPointerBufferDescriptor);
 as_bytes_impl_transmute!(HipcOutPointerBufferDescriptor);
 as_bytes_impl_transmute!(HipcMapAliasBufferDescriptor);
+
+from_bytes_impl_transmute!(HipcHeader);
+from_bytes_impl_transmute!(HipcSpecialHeader);
+from_bytes_impl_transmute!(HipcInPointerBufferDescriptor);
+from_bytes_impl_transmute!(HipcOutPointerBufferDescriptor);
+from_bytes_impl_transmute!(HipcMapAliasBufferDescriptor);
 
 impl HipcInPointerBufferDescriptor {
     pub fn new(index: usize, address: usize, size: usize) -> Self {

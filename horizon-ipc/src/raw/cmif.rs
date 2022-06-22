@@ -1,6 +1,6 @@
 use horizon_error::ErrorCode;
 
-use crate::conv_traits::as_bytes_impl_transmute;
+use crate::conv_traits::{as_bytes_impl_transmute, from_bytes_impl_transmute};
 
 #[repr(C)]
 pub struct CmifInHeader {
@@ -15,6 +15,7 @@ impl CmifInHeader {
 }
 
 as_bytes_impl_transmute!(CmifInHeader);
+from_bytes_impl_transmute!(CmifInHeader);
 
 #[repr(C)]
 pub struct CmifOutHeader {
@@ -29,6 +30,7 @@ impl CmifOutHeader {
 }
 
 as_bytes_impl_transmute!(CmifOutHeader);
+from_bytes_impl_transmute!(CmifOutHeader);
 
 #[repr(C)]
 pub struct CmifDomainInHeader {
@@ -41,6 +43,7 @@ pub struct CmifDomainInHeader {
 }
 
 as_bytes_impl_transmute!(CmifDomainInHeader);
+from_bytes_impl_transmute!(CmifDomainInHeader);
 
 #[repr(C)]
 pub struct CmifDomainOutHeader {
@@ -49,3 +52,4 @@ pub struct CmifDomainOutHeader {
 }
 
 as_bytes_impl_transmute!(CmifDomainOutHeader);
+from_bytes_impl_transmute!(CmifDomainOutHeader);

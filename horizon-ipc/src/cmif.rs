@@ -1,10 +1,10 @@
-use crate::conv_traits::{WriteAsBytes, Writer};
-use crate::hipc::HipcPayload;
-use crate::raw::cmif::{CmifDomainInHeader, CmifInHeader};
-use alloc::sync::Arc;
+use crate::conv_traits::{ReadFromBytes, Reader, WriteAsBytes, Writer};
+use crate::hipc::HipcPayloadIn;
+use crate::raw::cmif::{CmifDomainInHeader, CmifInHeader, CmifOutHeader};
 use core::borrow::Borrow;
 use core::marker::PhantomData;
 use core::ops::Deref;
+use horizon_error::ErrorCode;
 use horizon_svc::RawHandle;
 
 #[repr(u16)]
@@ -91,7 +91,7 @@ pub struct DomainRequest<'a, T: WriteAsBytes> {
     input_objects: &'a [u32],
     /// Id of the object in the domain on which to operate (use as this)
     object_id: u32,
-    normal_request: Request<'a, T>,
+    normal_request: NormalRequest<'a, T>,
 }
 
 impl<'a, T: WriteAsBytes> WriteAsBytes for DomainRequest<'a, T> {
@@ -111,19 +111,13 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for DomainRequest<'a, T> {
     }
 }
 
-impl<'a, T: WriteAsBytes> HipcPayload for DomainRequest<'a, T> {
-    fn get_type(&self) -> u16 {
-        self.normal_request.ty as u16
-    }
-}
-
-pub struct Request<'a, T: WriteAsBytes> {
+pub struct NormalRequest<'a, T: WriteAsBytes> {
     pub ty: CommandType,
     pub command_id: u32,
     pub input_parameters: &'a T,
 }
 
-impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
+impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
         dest.write(&CmifInHeader {
             magic: CmifInHeader::MAGIC,
@@ -136,8 +130,77 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
     }
 }
 
-impl<'a, T: WriteAsBytes> HipcPayload for Request<'a, T> {
+pub enum Request<'a, T: WriteAsBytes> {
+    Normal(NormalRequest<'a, T>),
+    Domain(DomainRequest<'a, T>),
+}
+
+impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
+    fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
+        // we need to align stuff to 16 bytes because CMIF does it
+        let aligned = dest.align(16);
+
+        // payload
+        match self {
+            Request::Normal(req) => dest.write(req),
+            Request::Domain(req) => dest.write(req),
+        }
+
+        // for some reason we have to insert padding at two places: before and after the payload
+        // they, in sum, should be 16 bytes
+        // (WTF man)
+        let zeroes = [0u8; 16];
+        dest.write_bytes(&zeroes[..aligned]);
+
+        // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
+        // we don't implement them currently, but they are used somewhat heavily across the codebase
+        // so we probably should implement them
+    }
+}
+
+impl<'a, T: WriteAsBytes> HipcPayloadIn for Request<'a, T> {
     fn get_type(&self) -> u16 {
-        self.ty as u16
+        (match self {
+            Request::Normal(rq) => rq.ty,
+            Request::Domain(rq) => rq.normal_request.ty,
+        }) as u16
+    }
+}
+
+pub struct NormalResponse<'d, T: ReadFromBytes<'d>> {
+    result: ErrorCode,
+    payload: T,
+    phantom: PhantomData<&'d ()>,
+}
+
+impl<'d, T: ReadFromBytes<'d>> NormalResponse<'d, T> {
+    pub fn as_result(&self) -> Result<&T, ErrorCode> {
+        self.result.into_result(&self.payload)
+    }
+}
+
+impl<'d, T: ReadFromBytes<'d>> ReadFromBytes<'d> for NormalResponse<'d, T> {
+    fn read_from_bytes(src: &mut (impl Reader<'d> + ?Sized)) -> Self {
+        // we need to align stuff to 16 bytes because CMIF does it
+        let aligned = src.align(16);
+
+        let header = src.read::<CmifOutHeader>();
+
+        debug_assert_eq!(header.magic, CmifOutHeader::MAGIC);
+        debug_assert_eq!(header.version, 0);
+        let result = header.result;
+
+        let payload = src.read::<T>();
+
+        // for some reason we have to insert padding at two places: before and after the payload
+        // they, in sum, should be 16 bytes
+        // (WTF man)
+        let _ = src.read_bytes(16 - aligned);
+
+        Self {
+            result,
+            payload,
+            phantom: Default::default(),
+        }
     }
 }

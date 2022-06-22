@@ -18,6 +18,7 @@ pub type ThreadEntrypointFn = unsafe extern "C" fn(*mut u8) -> !;
 pub type AddressRange = (Address, Size);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(transparent)]
 pub struct RawHandle(pub u32);
 
 pub const CURRENT_PROCESS_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8001);
