@@ -3,6 +3,10 @@ mod ipc_parse;
 use crate::ipc_parse::IpcFile;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use reqwest::{Client, IntoUrl};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_middleware_cache::managers::CACacheManager;
+use reqwest_middleware_cache::{Cache, CacheMode};
 use scraper::{Html, Selector};
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter};
@@ -18,6 +22,28 @@ static FILE_NAME_FORMAT: Lazy<Regex> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+static REQWEST_CLIENT: Lazy<ClientWithMiddleware> = Lazy::new(|| {
+    ClientBuilder::new(Client::new())
+        .with(Cache {
+            mode: CacheMode::Default,
+            cache_manager: CACacheManager::default(),
+        })
+        .build()
+});
+
+fn get<U: IntoUrl>(url: U) -> String {
+    tokio::runtime::Runtime::new().unwrap().block_on(async {
+        REQWEST_CLIENT
+            .get(url)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
+    })
+}
 
 #[derive(Eq, PartialEq)]
 enum Region {
@@ -69,7 +95,7 @@ impl FileId {
     pub fn get(&self) -> String {
         let url = format!("{}/{}", NINUPDATES_BASE_URL, self);
 
-        reqwest::blocking::get(url).unwrap().text().unwrap()
+        get(url)
     }
 }
 
@@ -95,7 +121,7 @@ fn get_file_list() -> Vec<FileId> {
         NINUPDATES_BASE_URL, NINUPDATES_DATE
     );
 
-    let list = reqwest::blocking::get(&url).unwrap().text().unwrap();
+    let list = get(&url);
 
     let html = Html::parse_document(&list);
 
