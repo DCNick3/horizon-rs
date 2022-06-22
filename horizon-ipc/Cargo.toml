@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 horizon-error = { path = "../horizon-error" }
 horizon-svc = { path = "../horizon-svc" }
+arrayvec = { version = "0.7.2", default-features = false }

@@ -3,13 +3,14 @@ use crate::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
 };
+use arrayvec::ArrayVec;
 use core::marker::PhantomData;
 use horizon_svc::RawHandle;
 
 /// Determines what MemoryState to use with the mapped memory in the sysmodule.
 /// Used to enforce whether or not device mapping is allowed for src and dst buffers respectively.
 #[repr(u32)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum MapAliasBufferMode {
     /// Device mapping *not* allowed for src or dst.
     Normal = 0,
@@ -28,12 +29,18 @@ pub struct ConstBuffer<'a> {
 }
 
 impl<'a> ConstBuffer<'a> {
-    pub fn null() -> Self {
+    pub const fn null() -> Self {
         Self {
             address: 0,
             size: 0,
-            phantom: PhantomData::default(),
+            phantom: PhantomData {},
         }
+    }
+
+    pub fn null_ref() -> &'static Self {
+        static NULL: ConstBuffer<'static> = ConstBuffer::null();
+
+        &NULL
     }
 
     // TODO: more constructors
@@ -46,12 +53,18 @@ pub struct MutBuffer<'a> {
 }
 
 impl<'a> MutBuffer<'a> {
-    pub fn null() -> Self {
+    pub const fn null() -> Self {
         Self {
             address: 0,
             size: 0,
-            phantom: PhantomData::default(),
+            phantom: PhantomData {},
         }
+    }
+
+    pub fn null_ref() -> &'static Self {
+        static NULL: MutBuffer<'static> = MutBuffer::null();
+
+        &NULL
     }
 
     // TODO: more constructors
@@ -69,19 +82,12 @@ pub enum Buffer<'a> {
 pub trait HipcPayloadIn<'a> {
     fn get_type(&self) -> u16;
 
-    type PointerInIter: Iterator<Item = &'a ConstBuffer<'a>>;
-    type PointerOutIter: Iterator<Item = &'a MutBuffer<'a>>;
+    fn get_pointer_in_buffers(&self) -> ArrayVec<&'a ConstBuffer<'a>, 8>;
+    fn get_pointer_out_buffers(&self) -> ArrayVec<&'a MutBuffer<'a>, 8>;
 
-    fn get_pointer_in_buffers(&self) -> Self::PointerInIter;
-    fn get_pointer_out_buffers(&self) -> Self::PointerOutIter;
-
-    type MapAliasInIter: Iterator<Item = &'a (MapAliasBufferMode, ConstBuffer<'a>)>;
-    type MapAliasOutIter: Iterator<Item = &'a (MapAliasBufferMode, MutBuffer<'a>)>;
-    type MapAliasInOutIter: Iterator<Item = &'a (MapAliasBufferMode, MutBuffer<'a>)>;
-
-    fn get_map_alias_in_buffers(&self) -> Self::MapAliasInIter;
-    fn get_map_alias_out_buffers(&self) -> Self::MapAliasOutIter;
-    fn get_map_alias_in_out_buffers(&self) -> Self::MapAliasInOutIter;
+    fn get_map_alias_in_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a ConstBuffer<'a>), 8>;
+    fn get_map_alias_out_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a MutBuffer<'a>), 8>;
+    fn get_map_alias_in_out_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a MutBuffer<'a>), 8>;
 
     fn get_send_pid(&self) -> Option<u64>;
 
@@ -136,12 +142,12 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
         dest.write(&HipcHeader {
             _bitfield_1: HipcHeader::new_bitfield_1(
                 self.payload.get_type(),
-                in_pointers.count() as _,
-                in_map_aliases.count() as _,
-                out_map_aliases.count() as _,
-                in_out_map_aliases.count() as _,
+                in_pointers.len() as _,
+                in_map_aliases.len() as _,
+                out_map_aliases.len() as _,
+                in_out_map_aliases.len() as _,
                 payload_size_in_words as _,
-                if out_pointers.count() == 0 {
+                if out_pointers.len() == 0 {
                     // If it has value 0, the C descriptor functionality is disabled.
                     0
                 } else {
@@ -151,7 +157,7 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
                     // Otherwise it has (flag-2) C descriptors.
                     //   In this case, index picks which C descriptor to copy
                     //   received data to [instead of picking the offset into the buffer].
-                    (2 + out_pointers.count()) as _
+                    (2 + out_pointers.len()) as _
                 },
                 0,
                 0,
@@ -194,7 +200,7 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
         // out_pointers
 
         // in_pointers
-        for (i, buf) in in_pointers.enumerate() {
+        for (i, buf) in in_pointers.iter().enumerate() {
             dest.write(&HipcInPointerBufferDescriptor::new(
                 i,
                 buf.address,
@@ -205,7 +211,7 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
         // in_map_aliases
         for (mode, buf) in in_map_aliases {
             dest.write(&HipcMapAliasBufferDescriptor::new(
-                *mode,
+                mode,
                 buf.address,
                 buf.size,
             ))
@@ -214,7 +220,7 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
         // out_map_aliases
         for (mode, buf) in out_map_aliases {
             dest.write(&HipcMapAliasBufferDescriptor::new(
-                *mode,
+                mode,
                 buf.address,
                 buf.size,
             ))
@@ -223,7 +229,7 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
         // in_out_map_aliases
         for (mode, buf) in in_out_map_aliases {
             dest.write(&HipcMapAliasBufferDescriptor::new(
-                *mode,
+                mode,
                 buf.address,
                 buf.size,
             ))

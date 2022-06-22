@@ -1,6 +1,7 @@
 use crate::conv_traits::{ReadFromBytes, Reader, WriteAsBytes, Writer};
-use crate::hipc::HipcPayloadIn;
+use crate::hipc::{ConstBuffer, HipcPayloadIn, MapAliasBufferMode, MutBuffer};
 use crate::raw::cmif::{CmifDomainInHeader, CmifInHeader, CmifOutHeader};
+use arrayvec::ArrayVec;
 use core::borrow::Borrow;
 use core::marker::PhantomData;
 use core::ops::Deref;
@@ -111,9 +112,36 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for DomainRequest<'a, T> {
     }
 }
 
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub enum BufferMode {
+    Pointer,
+    MapAlias(MapAliasBufferMode),
+    AutoSelect,
+}
+
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub struct BufferType {
+    pub mode: BufferMode,
+    pub is_fixed_size: bool,
+}
+
+pub enum BufferContent<'a> {
+    In(ConstBuffer<'a>),
+    Out(MutBuffer<'a>),
+}
+
+pub struct Buffer<'a> {
+    pub contents: BufferContent<'a>,
+    pub ty: BufferType,
+}
+
 pub struct NormalRequest<'a, T: WriteAsBytes> {
     pub ty: CommandType,
     pub command_id: u32,
+    pub send_pid: Option<u64>,
+    pub copy_handles: &'a [RawHandle],
+    pub move_handles: &'a [RawHandle],
+    pub buffers: &'a [Buffer<'a>],
     pub input_parameters: &'a T,
 }
 
@@ -130,82 +158,126 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
     }
 }
 
-// pub enum Request<'a, T: WriteAsBytes> {
-//     Normal(NormalRequest<'a, T>),
-//     Domain(DomainRequest<'a, T>),
-// }
-
-// impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
-//     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
-//         // we need to align stuff to 16 bytes because CMIF does it
-//         let aligned = dest.align(16);
-//
-//         // payload
-//         match self {
-//             Request::Normal(req) => dest.write(req),
-//             Request::Domain(req) => dest.write(req),
-//         }
-//
-//         // for some reason we have to insert padding at two places: before and after the payload
-//         // they, in sum, should be 16 bytes
-//         // (WTF man)
-//         let zeroes = [0u8; 16];
-//         dest.write_bytes(&zeroes[..aligned]);
-//
-//         // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
-//         // we don't implement them currently, but they are used somewhat heavily across the codebase
-//         // so we probably should implement them
-//     }
-// }
-
-//
-
 impl<'a, T: WriteAsBytes> HipcPayloadIn<'a> for NormalRequest<'a, T> {
     fn get_type(&self) -> u16 {
         self.ty as u16
     }
 
-    type PointerInIter = ();
-    type PointerOutIter = ();
-
-    fn get_pointer_in_buffers(&self) -> Self::PointerInIter {
-        todo!()
+    fn get_pointer_in_buffers(&self) -> ArrayVec<&'a ConstBuffer<'a>, 8> {
+        ArrayVec::from_iter(self.buffers.iter().filter_map(|b| match b {
+            Buffer {
+                contents: BufferContent::In(buf),
+                ty:
+                    BufferType {
+                        mode: BufferMode::Pointer | BufferMode::AutoSelect,
+                        ..
+                    },
+            } => {
+                if b.ty.mode == BufferMode::Pointer {
+                    Some(buf)
+                } else {
+                    // handle AutoSelect buffer here by putting a null descriptor
+                    Some(ConstBuffer::null_ref())
+                }
+            }
+            _ => None,
+        }))
     }
 
-    fn get_pointer_out_buffers(&self) -> Self::PointerOutIter {
-        todo!()
+    fn get_pointer_out_buffers(&self) -> ArrayVec<&'a MutBuffer<'a>, 8> {
+        ArrayVec::from_iter(self.buffers.iter().filter_map(|b| match b {
+            Buffer {
+                contents: BufferContent::Out(buf),
+                ty:
+                    BufferType {
+                        mode: BufferMode::Pointer | BufferMode::AutoSelect,
+                        ..
+                    },
+            } => {
+                if b.ty.mode == BufferMode::Pointer {
+                    Some(buf)
+                } else {
+                    // handle AutoSelect buffer here by putting a null descriptor
+                    Some(MutBuffer::null_ref())
+                }
+            }
+            _ => None,
+        }))
     }
 
-    type MapAliasInIter = ();
-    type MapAliasOutIter = ();
-    type MapAliasInOutIter = ();
-
-    fn get_map_alias_in_buffers(&self) -> Self::MapAliasInIter {
-        todo!()
+    fn get_map_alias_in_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a ConstBuffer<'a>), 8> {
+        ArrayVec::from_iter(self.buffers.iter().filter_map(|b| match b {
+            Buffer {
+                contents: BufferContent::In(buf),
+                ty:
+                    BufferType {
+                        mode: BufferMode::MapAlias(_) | BufferMode::AutoSelect,
+                        ..
+                    },
+            } => {
+                if let BufferMode::MapAlias(mode) = b.ty.mode {
+                    Some((mode, buf))
+                } else {
+                    Some((MapAliasBufferMode::Normal, buf))
+                }
+            }
+            _ => None,
+        }))
     }
 
-    fn get_map_alias_out_buffers(&self) -> Self::MapAliasOutIter {
-        todo!()
+    fn get_map_alias_out_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a MutBuffer<'a>), 8> {
+        ArrayVec::from_iter(self.buffers.iter().filter_map(|b| match b {
+            Buffer {
+                contents: BufferContent::Out(buf),
+                ty:
+                    BufferType {
+                        mode: BufferMode::MapAlias(_) | BufferMode::AutoSelect,
+                        ..
+                    },
+            } => {
+                if let BufferMode::MapAlias(mode) = b.ty.mode {
+                    Some((mode, buf))
+                } else {
+                    Some((MapAliasBufferMode::Normal, buf))
+                }
+            }
+            _ => None,
+        }))
     }
 
-    fn get_map_alias_in_out_buffers(&self) -> Self::MapAliasInOutIter {
-        todo!()
+    fn get_map_alias_in_out_buffers(&self) -> ArrayVec<(MapAliasBufferMode, &'a MutBuffer<'a>), 8> {
+        // no in_out buffers in CMIF =)
+        ArrayVec::new()
     }
 
     fn get_send_pid(&self) -> Option<u64> {
-        todo!()
+        self.send_pid
     }
 
     fn get_copy_handles(&self) -> &[RawHandle] {
-        todo!()
+        self.copy_handles
     }
 
     fn get_move_handles(&self) -> &[RawHandle] {
-        todo!()
+        self.move_handles
     }
 
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
-        todo!()
+        // we need to align stuff to 16 bytes because CMIF does it
+        let aligned = dest.align(16);
+
+        // payload
+        dest.write(self);
+
+        // for some reason we have to insert padding at two places: before and after the payload
+        // they, in sum, should be 16 bytes
+        // (WTF man)
+        let zeroes = [0u8; 16];
+        dest.write_bytes(&zeroes[..aligned]);
+
+        // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
+        // we don't implement them currently, but they are used somewhat heavily across the codebase
+        // so we probably should implement them
     }
 }
 
