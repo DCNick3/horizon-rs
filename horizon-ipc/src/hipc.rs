@@ -1,4 +1,4 @@
-use crate::conv_traits::{ReadFromBytes, Reader, WriteAsBytes, Writer};
+use crate::conv_traits::{CountingWriter, ReadFromBytes, Reader, WriteAsBytes, Writer};
 use crate::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
@@ -27,10 +27,34 @@ pub struct ConstBuffer<'a> {
     phantom: PhantomData<&'a ()>,
 }
 
+impl<'a> ConstBuffer<'a> {
+    pub fn null() -> Self {
+        Self {
+            address: 0,
+            size: 0,
+            phantom: PhantomData::default(),
+        }
+    }
+
+    // TODO: more constructors
+}
+
 pub struct MutBuffer<'a> {
     address: usize,
     size: usize,
     phantom: PhantomData<&'a ()>,
+}
+
+impl<'a> MutBuffer<'a> {
+    pub fn null() -> Self {
+        Self {
+            address: 0,
+            size: 0,
+            phantom: PhantomData::default(),
+        }
+    }
+
+    // TODO: more constructors
 }
 
 pub enum Buffer<'a> {
@@ -42,40 +66,59 @@ pub enum Buffer<'a> {
     MapAliasInOut(MapAliasBufferMode, MutBuffer<'a>),
 }
 
-pub trait HipcPayloadIn: WriteAsBytes {
+pub trait HipcPayloadIn<'a> {
     fn get_type(&self) -> u16;
+
+    type PointerInIter: Iterator<Item = &'a ConstBuffer<'a>>;
+    type PointerOutIter: Iterator<Item = &'a MutBuffer<'a>>;
+
+    fn get_pointer_in_buffers(&self) -> Self::PointerInIter;
+    fn get_pointer_out_buffers(&self) -> Self::PointerOutIter;
+
+    type MapAliasInIter: Iterator<Item = &'a (MapAliasBufferMode, ConstBuffer<'a>)>;
+    type MapAliasOutIter: Iterator<Item = &'a (MapAliasBufferMode, MutBuffer<'a>)>;
+    type MapAliasInOutIter: Iterator<Item = &'a (MapAliasBufferMode, MutBuffer<'a>)>;
+
+    fn get_map_alias_in_buffers(&self) -> Self::MapAliasInIter;
+    fn get_map_alias_out_buffers(&self) -> Self::MapAliasOutIter;
+    fn get_map_alias_in_out_buffers(&self) -> Self::MapAliasInOutIter;
+
+    fn get_send_pid(&self) -> Option<u64>;
+
+    fn get_copy_handles(&self) -> &[RawHandle];
+    fn get_move_handles(&self) -> &[RawHandle];
+
+    fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized));
+
+    #[inline]
+    fn size(&self) -> usize {
+        let mut writer = CountingWriter::new();
+
+        self.write_as_bytes(&mut writer);
+
+        writer.count()
+    }
 }
 
-pub struct Request<'a, 'b, P: HipcPayloadIn> {
-    pub send_pid: Option<u64>,
-    pub buffers: &'b [Buffer<'a>],
-    pub copy_handles: &'b [RawHandle],
-    pub move_handles: &'b [RawHandle],
-    pub payload: &'b P,
+pub struct Request<'p, P: HipcPayloadIn<'p>> {
+    pub payload: &'p P,
 }
 
-impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
+impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
-        let mut in_pointers_count = 0;
-        let mut out_pointers_count = 0;
+        let in_pointers = self.payload.get_pointer_in_buffers();
+        let out_pointers = self.payload.get_pointer_out_buffers();
 
-        let mut in_map_aliases_count = 0;
-        let mut out_map_aliases_count = 0;
-        let mut in_out_map_aliases_count = 0;
+        let in_map_aliases = self.payload.get_map_alias_in_buffers();
+        let out_map_aliases = self.payload.get_map_alias_out_buffers();
+        let in_out_map_aliases = self.payload.get_map_alias_in_out_buffers();
 
-        for buffer in self.buffers {
-            match buffer {
-                Buffer::PointerIn(_) => in_pointers_count += 1,
-                Buffer::PointerOut(_) => out_pointers_count += 1,
-                Buffer::MapAliasIn(_, _) => in_map_aliases_count += 1,
-                Buffer::MapAliasOut(_, _) => out_map_aliases_count += 1,
-                Buffer::MapAliasInOut(_, _) => in_out_map_aliases_count += 1,
-            }
-        }
+        let send_pid = self.payload.get_send_pid();
+        let move_handles = self.payload.get_move_handles();
+        let copy_handles = self.payload.get_move_handles();
 
-        let has_special_header = !self.move_handles.is_empty()
-            || !self.copy_handles.is_empty()
-            || self.send_pid.is_some();
+        let has_special_header =
+            !move_handles.is_empty() || !copy_handles.is_empty() || send_pid.is_some();
 
         let payload_size = self.payload.size();
 
@@ -93,12 +136,12 @@ impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
         dest.write(&HipcHeader {
             _bitfield_1: HipcHeader::new_bitfield_1(
                 self.payload.get_type(),
-                in_pointers_count,
-                in_map_aliases_count,
-                out_map_aliases_count,
-                in_out_map_aliases_count,
+                in_pointers.count() as _,
+                in_map_aliases.count() as _,
+                out_map_aliases.count() as _,
+                in_out_map_aliases.count() as _,
                 payload_size_in_words as _,
-                if out_pointers_count == 0 {
+                if out_pointers.count() == 0 {
                     // If it has value 0, the C descriptor functionality is disabled.
                     0
                 } else {
@@ -108,7 +151,7 @@ impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
                     // Otherwise it has (flag-2) C descriptors.
                     //   In this case, index picks which C descriptor to copy
                     //   received data to [instead of picking the offset into the buffer].
-                    2 + out_pointers_count
+                    (2 + out_pointers.count()) as _
                 },
                 0,
                 0,
@@ -116,28 +159,28 @@ impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
             ),
         });
 
-        assert!(self.copy_handles.len() < (1 << 4));
-        assert!(self.move_handles.len() < (1 << 4));
+        assert!(copy_handles.len() < (1 << 4));
+        assert!(move_handles.len() < (1 << 4));
 
         if has_special_header {
             dest.write(&HipcSpecialHeader {
                 _bitfield_1: HipcSpecialHeader::new_bitfield_1(
-                    self.send_pid.is_some() as _,
-                    self.copy_handles.len() as _,
-                    self.move_handles.len() as _,
+                    send_pid.is_some() as _,
+                    copy_handles.len() as _,
+                    move_handles.len() as _,
                     0,
                 ),
             });
 
-            if let Some(pid) = &self.send_pid {
+            if let Some(pid) = &send_pid {
                 dest.write(pid)
             }
 
             // TODO: allow sending 0 as a handle
-            for handle in self.copy_handles {
+            for handle in copy_handles {
                 dest.write(&handle.0)
             }
-            for handle in self.move_handles {
+            for handle in move_handles {
                 dest.write(&handle.0)
             }
         }
@@ -151,57 +194,47 @@ impl<'a, 'b, P: HipcPayloadIn> WriteAsBytes for Request<'a, 'b, P> {
         // out_pointers
 
         // in_pointers
-        for (i, buffer) in self.buffers.iter().enumerate() {
-            if let Buffer::PointerIn(buf) = buffer {
-                dest.write(&HipcInPointerBufferDescriptor::new(
-                    i,
-                    buf.address,
-                    buf.size,
-                ))
-            }
+        for (i, buf) in in_pointers.enumerate() {
+            dest.write(&HipcInPointerBufferDescriptor::new(
+                i,
+                buf.address,
+                buf.size,
+            ))
         }
 
         // in_map_aliases
-        for buffer in self.buffers.iter() {
-            if let Buffer::MapAliasIn(mode, buf) = buffer {
-                dest.write(&HipcMapAliasBufferDescriptor::new(
-                    *mode,
-                    buf.address,
-                    buf.size,
-                ))
-            }
+        for (mode, buf) in in_map_aliases {
+            dest.write(&HipcMapAliasBufferDescriptor::new(
+                *mode,
+                buf.address,
+                buf.size,
+            ))
         }
 
         // out_map_aliases
-        for buffer in self.buffers.iter() {
-            if let Buffer::MapAliasOut(mode, buf) = buffer {
-                dest.write(&HipcMapAliasBufferDescriptor::new(
-                    *mode,
-                    buf.address,
-                    buf.size,
-                ))
-            }
+        for (mode, buf) in out_map_aliases {
+            dest.write(&HipcMapAliasBufferDescriptor::new(
+                *mode,
+                buf.address,
+                buf.size,
+            ))
         }
 
         // in_out_map_aliases
-        for buffer in self.buffers.iter() {
-            if let Buffer::MapAliasInOut(mode, buf) = buffer {
-                dest.write(&HipcMapAliasBufferDescriptor::new(
-                    *mode,
-                    buf.address,
-                    buf.size,
-                ))
-            }
+        for (mode, buf) in in_out_map_aliases {
+            dest.write(&HipcMapAliasBufferDescriptor::new(
+                *mode,
+                buf.address,
+                buf.size,
+            ))
         }
 
         // payload
-        dest.write(self.payload);
+        self.payload.write_as_bytes(dest);
 
         // out_pointers
-        for buffer in self.buffers.iter() {
-            if let Buffer::PointerOut(buf) = buffer {
-                dest.write(&HipcOutPointerBufferDescriptor::new(buf.address, buf.size))
-            }
+        for buf in out_pointers {
+            dest.write(&HipcOutPointerBufferDescriptor::new(buf.address, buf.size))
         }
     }
 }

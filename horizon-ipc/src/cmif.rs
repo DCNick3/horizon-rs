@@ -96,7 +96,7 @@ pub struct DomainRequest<'a, T: WriteAsBytes> {
 
 impl<'a, T: WriteAsBytes> WriteAsBytes for DomainRequest<'a, T> {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
-        let normal_request_size = self.normal_request.size();
+        let normal_request_size = WriteAsBytes::size(&self.normal_request);
 
         dest.write(&CmifDomainInHeader {
             type_: self.request_type as u8,
@@ -130,40 +130,82 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
     }
 }
 
-pub enum Request<'a, T: WriteAsBytes> {
-    Normal(NormalRequest<'a, T>),
-    Domain(DomainRequest<'a, T>),
-}
+// pub enum Request<'a, T: WriteAsBytes> {
+//     Normal(NormalRequest<'a, T>),
+//     Domain(DomainRequest<'a, T>),
+// }
 
-impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
-    fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
-        // we need to align stuff to 16 bytes because CMIF does it
-        let aligned = dest.align(16);
+// impl<'a, T: WriteAsBytes> WriteAsBytes for Request<'a, T> {
+//     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
+//         // we need to align stuff to 16 bytes because CMIF does it
+//         let aligned = dest.align(16);
+//
+//         // payload
+//         match self {
+//             Request::Normal(req) => dest.write(req),
+//             Request::Domain(req) => dest.write(req),
+//         }
+//
+//         // for some reason we have to insert padding at two places: before and after the payload
+//         // they, in sum, should be 16 bytes
+//         // (WTF man)
+//         let zeroes = [0u8; 16];
+//         dest.write_bytes(&zeroes[..aligned]);
+//
+//         // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
+//         // we don't implement them currently, but they are used somewhat heavily across the codebase
+//         // so we probably should implement them
+//     }
+// }
 
-        // payload
-        match self {
-            Request::Normal(req) => dest.write(req),
-            Request::Domain(req) => dest.write(req),
-        }
+//
 
-        // for some reason we have to insert padding at two places: before and after the payload
-        // they, in sum, should be 16 bytes
-        // (WTF man)
-        let zeroes = [0u8; 16];
-        dest.write_bytes(&zeroes[..aligned]);
-
-        // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
-        // we don't implement them currently, but they are used somewhat heavily across the codebase
-        // so we probably should implement them
-    }
-}
-
-impl<'a, T: WriteAsBytes> HipcPayloadIn for Request<'a, T> {
+impl<'a, T: WriteAsBytes> HipcPayloadIn<'a> for NormalRequest<'a, T> {
     fn get_type(&self) -> u16 {
-        (match self {
-            Request::Normal(rq) => rq.ty,
-            Request::Domain(rq) => rq.normal_request.ty,
-        }) as u16
+        self.ty as u16
+    }
+
+    type PointerInIter = ();
+    type PointerOutIter = ();
+
+    fn get_pointer_in_buffers(&self) -> Self::PointerInIter {
+        todo!()
+    }
+
+    fn get_pointer_out_buffers(&self) -> Self::PointerOutIter {
+        todo!()
+    }
+
+    type MapAliasInIter = ();
+    type MapAliasOutIter = ();
+    type MapAliasInOutIter = ();
+
+    fn get_map_alias_in_buffers(&self) -> Self::MapAliasInIter {
+        todo!()
+    }
+
+    fn get_map_alias_out_buffers(&self) -> Self::MapAliasOutIter {
+        todo!()
+    }
+
+    fn get_map_alias_in_out_buffers(&self) -> Self::MapAliasInOutIter {
+        todo!()
+    }
+
+    fn get_send_pid(&self) -> Option<u64> {
+        todo!()
+    }
+
+    fn get_copy_handles(&self) -> &[RawHandle] {
+        todo!()
+    }
+
+    fn get_move_handles(&self) -> &[RawHandle] {
+        todo!()
+    }
+
+    fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
+        todo!()
     }
 }
 

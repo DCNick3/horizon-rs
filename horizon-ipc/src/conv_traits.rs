@@ -23,6 +23,16 @@ pub trait Reader<'d> {
 
 pub struct CountingWriter(usize);
 
+impl CountingWriter {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn count(&self) -> usize {
+        self.0
+    }
+}
+
 impl Writer for CountingWriter {
     #[inline]
     fn write_bytes(&mut self, data: &[u8]) {
