@@ -182,6 +182,20 @@ pub enum BufferContent<'a> {
     Out(MutBuffer<'a>),
 }
 
+impl<'a> BufferContent<'a> {
+    pub fn direction(&self) -> BufferDirection {
+        match self {
+            BufferContent::In(_) => BufferDirection::In,
+            BufferContent::Out(_) => BufferDirection::Out,
+        }
+    }
+}
+
+pub enum BufferDirection {
+    In,
+    Out,
+}
+
 pub struct Buffer<'a> {
     pub contents: BufferContent<'a>,
     pub ty: BufferType,
@@ -206,9 +220,21 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
             token: 0,
         });
 
-        // TODO: !!! Somewhere (?) we should save the lengths of some (?) buffers as an array of u16s
-
         dest.write(self.input_parameters);
+
+        dest.align(2);
+
+        for b in self.buffers {
+            if let BufferContent::Out(contents) = &b.contents {
+                if matches!(b.ty.mode, BufferMode::AutoSelect | BufferMode::Pointer)
+                    && !b.ty.is_fixed_size
+                {
+                    dest.write(&(contents.size() as u16));
+                }
+            }
+        }
+
+        dest.align(4);
     }
 }
 

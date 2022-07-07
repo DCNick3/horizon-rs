@@ -62,6 +62,10 @@ impl<'a> ConstBuffer<'a> {
     }
 
     // TODO: more constructors
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
 }
 
 pub struct MutBuffer<'a> {
@@ -103,6 +107,10 @@ impl<'a> MutBuffer<'a> {
     }
 
     // TODO: more constructors
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
 }
 
 pub enum Buffer<'a> {
@@ -112,6 +120,18 @@ pub enum Buffer<'a> {
     MapAliasIn(MapAliasBufferMode, ConstBuffer<'a>),
     MapAliasOut(MapAliasBufferMode, MutBuffer<'a>),
     MapAliasInOut(MapAliasBufferMode, MutBuffer<'a>),
+}
+
+impl<'a> Buffer<'a> {
+    pub fn size(&self) -> usize {
+        match self {
+            Buffer::PointerIn(b) => b.size,
+            Buffer::PointerOut(b) => b.size,
+            Buffer::MapAliasIn(_, b) => b.size,
+            Buffer::MapAliasOut(_, b) => b.size,
+            Buffer::MapAliasInOut(_, b) => b.size,
+        }
+    }
 }
 
 pub trait HipcPayloadIn<'a> {
