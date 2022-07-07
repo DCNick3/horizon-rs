@@ -28,7 +28,7 @@ pub trait AsRawSessionHandle {
 pub struct SessionHandle(RawHandle);
 
 impl SessionHandle {
-    pub fn as_ref(&self) -> SessionHandleRef {
+    pub fn as_ref(&self) -> SessionHandleRef<'_> {
         SessionHandleRef::new(self)
     }
 }

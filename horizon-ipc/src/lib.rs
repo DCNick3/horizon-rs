@@ -1,4 +1,5 @@
 #![no_std]
+#![deny(rust_2018_idioms)]
 
 extern crate alloc;
 

@@ -68,6 +68,58 @@ impl Writer for Vec<u8> {
     }
 }
 
+pub struct SliceWriter<'d> {
+    leftover: &'d mut [u8],
+    pos: usize,
+}
+
+impl<'d> SliceWriter<'d> {
+    pub fn new(buffer: &'d mut [u8]) -> Self {
+        Self {
+            leftover: buffer,
+            pos: 0,
+        }
+    }
+
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
+impl<'d> Writer for SliceWriter<'d> {
+    #[inline]
+    fn write_bytes(&mut self, data: &[u8]) {
+        // do a trick to make the compiler sure we would not have multuple refs to the buffer
+        // if we did not replace the leftover with &mut [],
+        //   after the split_at_mut there would be aliasing references to the buffer
+        let left = core::mem::replace(&mut self.leftover, &mut []);
+
+        let (write, left) = left.split_at_mut(data.len());
+
+        write.copy_from_slice(data);
+
+        self.leftover = left;
+        self.pos += data.len();
+    }
+
+    #[inline]
+    fn align(&mut self, alignment: usize) -> usize {
+        let left = core::mem::replace(&mut self.leftover, &mut []);
+
+        let new_pos = ((self.pos + alignment - 1) / alignment) * alignment;
+        let need_align = new_pos - self.pos;
+
+        let (align, left) = left.split_at_mut(need_align);
+
+        align.fill(0);
+
+        self.leftover = left;
+        self.pos = new_pos;
+
+        need_align
+    }
+}
+
 pub struct SliceReader<'d> {
     leftover: &'d [u8],
     pos: usize,
