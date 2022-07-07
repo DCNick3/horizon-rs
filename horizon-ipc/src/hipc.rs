@@ -247,16 +247,10 @@ impl<'p, P: HipcPayloadIn<'p>> WriteAsBytes for Request<'p, P> {
 
 pub struct Response<'d, P: ReadFromBytes<'d>> {
     // TODO: static/pointer recv descriptors
-    pid: Option<u64>,
-    move_handles: &'d [u8],
-    copy_handles: &'d [u8],
-    payload: P,
-}
-
-impl<'d, P: ReadFromBytes<'d>> Response<'d, P> {
-    pub fn payload(&self) -> &P {
-        &self.payload
-    }
+    pub pid: Option<u64>,
+    pub move_handles: Handles<'d>,
+    pub copy_handles: Handles<'d>,
+    pub payload: P,
 }
 
 impl<'d, P: ReadFromBytes<'d>> ReadFromBytes<'d> for Response<'d, P> {
@@ -271,7 +265,7 @@ impl<'d, P: ReadFromBytes<'d>> ReadFromBytes<'d> for Response<'d, P> {
         debug_assert_eq!(header.num_out_map_aliases(), 0);
         debug_assert_eq!(header.num_inout_map_aliases(), 0);
 
-        let payload_size = header.num_data_words() * 4;
+        let _payload_size = header.num_data_words() * 4;
 
         debug_assert_eq!(header.out_pointer_mode(), 0);
 
@@ -293,14 +287,19 @@ impl<'d, P: ReadFromBytes<'d>> ReadFromBytes<'d> for Response<'d, P> {
             let copy_handles = src.read_bytes((num_copy_handles * 4) as _);
             let move_handles = src.read_bytes((num_move_handles * 4) as _);
 
-            (pid, copy_handles, move_handles)
+            (pid, Handles::new(copy_handles), Handles::new(move_handles))
         } else {
-            (None, [].as_slice(), [].as_slice())
+            (None, Handles::empty(), Handles::empty())
         };
 
         if num_pointer_desc != 0 {
             todo!("Reading pointer descriptors from the response")
         }
+
+        // TODO: we may use the payload size to limit the bytes read to validate the payload read logic
+        // but yuzu calculates the payload_size in a wrong way, so we can't use it (at least for now)
+
+        // let payload_data = src.read_bytes()
 
         let payload = src.read::<P>();
 
@@ -310,5 +309,57 @@ impl<'d, P: ReadFromBytes<'d>> ReadFromBytes<'d> for Response<'d, P> {
             copy_handles,
             payload,
         }
+    }
+}
+
+pub struct Handles<'d> {
+    handles: &'d [u8],
+}
+
+impl<'d> Handles<'d> {
+    const HANDLE_SIZE: usize = 4;
+
+    pub fn empty() -> Self {
+        Self { handles: &[] }
+    }
+
+    pub fn new(handles: &'d [u8]) -> Self {
+        assert_eq!(handles.len() % Self::HANDLE_SIZE, 0);
+        Self { handles: handles }
+    }
+
+    pub fn len(&self) -> usize {
+        self.handles.len() / Self::HANDLE_SIZE
+    }
+
+    /// # Safety
+    /// Index should be in bounds
+    unsafe fn get_unchecked(&self, index: usize) -> RawHandle {
+        let v = u32::from_le_bytes(
+            self.handles
+                // SAFETY: index should be in bounds
+                .get_unchecked(index * Self::HANDLE_SIZE..(index + 1) * Self::HANDLE_SIZE)
+                .try_into()
+                // SAFETY: the slice should be always the length of Self::HANDLE_SIZE (4) which is suitable for u32
+                .unwrap_unchecked(),
+        );
+
+        RawHandle(v)
+    }
+
+    /// Converts the raw handles into an array of handles of fixed size  
+    ///
+    /// Panics if the size is mismatched
+    pub fn into_array<const SIZE: usize>(self) -> [RawHandle; SIZE] {
+        let len = self.len();
+        assert_eq!(len, SIZE);
+        let mut r = [RawHandle(0); SIZE];
+
+        for i in 0..len {
+            // SAFETY: i is in bounds
+            r[i] = unsafe { self.get_unchecked(i) };
+        }
+
+        r
     }
 }

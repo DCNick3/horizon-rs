@@ -17,9 +17,15 @@ pub type Size = usize;
 pub type ThreadEntrypointFn = unsafe extern "C" fn(*mut u8) -> !;
 pub type AddressRange = (Address, Size);
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct RawHandle(pub u32);
+
+impl core::fmt::Debug for RawHandle {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(fmt, "RawHandle({:08x})", self.0)
+    }
+}
 
 pub const CURRENT_PROCESS_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8001);
 pub const CURRENT_THREAD_PSEUDO_HANDLE: RawHandle = RawHandle(0xFFFF8000);
