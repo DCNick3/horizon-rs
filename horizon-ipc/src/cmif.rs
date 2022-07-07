@@ -221,20 +221,6 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
         });
 
         dest.write(self.input_parameters);
-
-        dest.align(2);
-
-        for b in self.buffers {
-            if let BufferContent::Out(contents) = &b.contents {
-                if matches!(b.ty.mode, BufferMode::AutoSelect | BufferMode::Pointer)
-                    && !b.ty.is_fixed_size
-                {
-                    dest.write(&(contents.size() as u16));
-                }
-            }
-        }
-
-        dest.align(4);
     }
 }
 
@@ -355,9 +341,19 @@ impl<'a, T: WriteAsBytes> HipcPayloadIn<'a> for NormalRequest<'a, T> {
         let zeroes = [0u8; 16];
         dest.write_bytes(&zeroes[aligned..]);
 
-        // TODO: if (when) we had supported them, sizes of buffers that are HipcAutoSelect would go here
-        // we don't implement them currently, but they are used somewhat heavily across the codebase
-        // so we probably should implement them
+        dest.align(2);
+
+        for b in self.buffers {
+            if let BufferContent::Out(contents) = &b.contents {
+                if matches!(b.ty.mode, BufferMode::AutoSelect | BufferMode::Pointer)
+                    && !b.ty.is_fixed_size
+                {
+                    dest.write(&(contents.size() as u16));
+                }
+            }
+        }
+
+        dest.align(4);
     }
 }
 
