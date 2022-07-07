@@ -43,6 +43,24 @@ impl<'a> ConstBuffer<'a> {
         &NULL
     }
 
+    pub fn from_str(s: &'a str) -> Self {
+        Self {
+            // TODO: pointers cannot be cast to integers during const eval
+            address: s.as_ptr() as usize,
+            size: s.len(),
+            phantom: PhantomData {},
+        }
+    }
+
+    pub fn from_bytes(b: &'a [u8]) -> Self {
+        Self {
+            // TODO: pointers cannot be cast to integers during const eval
+            address: b.as_ptr() as usize,
+            size: b.len(),
+            phantom: PhantomData {},
+        }
+    }
+
     // TODO: more constructors
 }
 
@@ -65,6 +83,23 @@ impl<'a> MutBuffer<'a> {
         static NULL: MutBuffer<'static> = MutBuffer::null();
 
         &NULL
+    }
+
+    pub fn from_bytes(b: &'a mut [u8]) -> Self {
+        Self {
+            // TODO: pointers cannot be cast to integers during const eval
+            address: b.as_ptr() as usize,
+            size: b.len(),
+            phantom: PhantomData {},
+        }
+    }
+
+    pub unsafe fn from_slice_transmute<T>(b: &'a mut [T]) -> Self {
+        Self {
+            address: b.as_ptr() as usize,
+            size: b.len() * core::mem::size_of::<T>(),
+            phantom: PhantomData {},
+        }
     }
 
     // TODO: more constructors

@@ -206,6 +206,8 @@ impl<'a, T: WriteAsBytes> WriteAsBytes for NormalRequest<'a, T> {
             token: 0,
         });
 
+        // TODO: !!! Somewhere (?) we should save the lengths of some (?) buffers as an array of u16s
+
         dest.write(self.input_parameters);
     }
 }
