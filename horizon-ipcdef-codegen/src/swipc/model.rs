@@ -2,6 +2,7 @@ use arcstr::ArcStr;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use derivative::Derivative;
 use itertools::Itertools;
+use std::cell::RefCell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -38,7 +39,7 @@ impl NominalType {
     pub fn resolve_with_depth(
         &self,
         file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
+        context: &TypecheckContext,
         depth_limit: usize,
     ) -> Result<StructuralType> {
         Ok(match self {
@@ -50,63 +51,42 @@ impl NominalType {
             NominalType::TypeName {
                 name,
                 reference_location,
-            } => {
-                if let Some(t) = context.get(name) {
-                    match t {
-                        TypeWithName::TypeAlias(t) => {
-                            if depth_limit == 0 {
-                                return Err(vec![Diagnostic::error()
-                                    .with_message("Resolve recursion limit exceeded")
-                                    .with_labels(vec![Label::primary(
-                                        file_id,
-                                        t.location.clone(),
-                                    )])]);
-                            }
-
-                            let ty = t
-                                .referenced_type
-                                .resolve_with_depth(file_id, context, depth_limit - 1)
-                                .map_err(|e| {
-                                    e.into_iter()
-                                        .map(|e| {
-                                            e.with_labels(vec![
-                                                Label::secondary(
-                                                    file_id,
-                                                    reference_location.clone(),
-                                                )
-                                                .with_message(format!(
-                                                    "While resolving type named `{}`",
-                                                    name
-                                                )),
-                                                Label::secondary(file_id, t.location.clone())
-                                                    .with_message("Defined as a typedef"),
-                                            ])
-                                        })
-                                        .collect::<Vec<_>>()
-                                })?;
-                            ty
-                        }
-                        TypeWithName::StructDef(s) => StructuralType::Struct(s.clone()),
-                        TypeWithName::EnumDef(e) => StructuralType::Enum(e.clone()),
-                        TypeWithName::BitflagsDef(b) => StructuralType::Bitflags(b.clone()),
+            } => match context.resolve_type(name, file_id, reference_location)? {
+                TypeWithName::TypeAlias(t) => {
+                    if depth_limit == 0 {
+                        return Err(vec![Diagnostic::error()
+                            .with_message("Resolve recursion limit exceeded")
+                            .with_labels(vec![Label::primary(file_id, t.location.clone())])]);
                     }
-                } else {
-                    return Err(vec![Diagnostic::error()
-                        .with_message(format!("Could not resolve type named `{}`", name))
-                        .with_labels(vec![Label::primary(
-                            file_id,
-                            reference_location.clone(),
-                        )])]);
+
+                    let ty = t
+                        .referenced_type
+                        .resolve_with_depth(file_id, context, depth_limit - 1)
+                        .map_err(|e| {
+                            e.into_iter()
+                                .map(|e| {
+                                    e.with_labels(vec![
+                                        Label::secondary(file_id, reference_location.clone())
+                                            .with_message(format!(
+                                                "While resolving type named `{}`",
+                                                name
+                                            )),
+                                        Label::secondary(file_id, t.location.clone())
+                                            .with_message("Defined as a typedef"),
+                                    ])
+                                })
+                                .collect::<Vec<_>>()
+                        })?;
+                    ty
                 }
-            }
+                TypeWithName::StructDef(s) => StructuralType::Struct(s.clone()),
+                TypeWithName::EnumDef(e) => StructuralType::Enum(e.clone()),
+                TypeWithName::BitflagsDef(b) => StructuralType::Bitflags(b.clone()),
+            },
         })
     }
 
-    pub fn resolve(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<StructuralType> {
+    pub fn resolve(&self, file_id: usize, context: &TypecheckContext) -> Result<StructuralType> {
         self.resolve_with_depth(file_id, context, 16)
     }
 }
@@ -201,9 +181,9 @@ pub enum Value {
     Out(NominalType),
 
     /// sf::SharedPointer<T>
-    InObject(ArcStr),
+    InObject(ArcStr, Span),
     /// sf::Out<sf::SharedPointer<T>>
-    OutObject(Option<ArcStr>),
+    OutObject(Option<ArcStr>, Span),
 
     /// sf::CopyHandle
     /// sf::MoveHandle
@@ -239,6 +219,32 @@ pub enum Value {
     /// sf::OutNonDeviceBuffer
     /// sf::OutNonSecureAutoSelectBuffer
     OutBuffer(BufferTransferMode, BufferExtraAttrs),
+}
+
+impl Value {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+        match self {
+            Value::ClientProcessId
+            | Value::InHandle(_)
+            | Value::OutHandle(_)
+            | Value::InBuffer(_, _)
+            | Value::OutBuffer(_, _) => Ok(()),
+            Value::In(t) | Value::Out(t) | Value::InArray(t, _) | Value::OutArray(t, _) => {
+                t.resolve(file_id, context).map(|_| ())
+            }
+            Value::InObject(obj, location) => context
+                .resolve_interface(obj, file_id, location)
+                .map(|_| ()),
+            Value::OutObject(obj, location) => obj
+                .as_ref()
+                .map(|obj| {
+                    context
+                        .resolve_interface(obj, file_id, location)
+                        .map(|_| ())
+                })
+                .unwrap_or(Ok(())),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -316,11 +322,7 @@ pub struct StructField {
 }
 
 impl StructField {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<()> {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
         match self.ty.resolve(file_id, context) {
             Ok(t) => {
                 if !t.is_sized() {
@@ -399,11 +401,7 @@ impl Struct {
         })
     }
 
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<()> {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut fields = BTreeMap::new();
@@ -453,7 +451,7 @@ impl EnumArm {
     pub fn typecheck(
         &self,
         file_id: usize,
-        _context: &BTreeMap<ArcStr, TypeWithName>,
+        _context: &TypecheckContext,
         base_type: IntType,
     ) -> Result<()> {
         if !base_type.fits_u64(self.value) {
@@ -479,11 +477,7 @@ pub struct Enum {
 }
 
 impl Enum {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<()> {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut arm_values: BTreeMap<u64, &EnumArm> = BTreeMap::new();
@@ -549,7 +543,7 @@ impl BitflagsArm {
     pub fn typecheck(
         &self,
         file_id: usize,
-        _context: &BTreeMap<ArcStr, TypeWithName>,
+        _context: &TypecheckContext,
         base_type: IntType,
     ) -> Result<()> {
         if !base_type.fits_u64(self.value) {
@@ -575,11 +569,7 @@ pub struct Bitflags {
 }
 
 impl Bitflags {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<()> {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut arm_names: BTreeMap<&ArcStr, &BitflagsArm> = BTreeMap::new();
@@ -616,20 +606,105 @@ impl Bitflags {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
 pub struct Command {
     // TODO: do we want to support multiple versions & version requirements at all?
     pub id: u32,
     pub name: ArcStr,
     // those define both in and out arguments
     pub arguments: Vec<(Option<ArcStr>, Arc<Value>)>,
+    #[derivative(PartialEq = "ignore")]
+    pub location: Span,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+impl Command {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+        let mut diags = Vec::new();
+
+        for (_, arg) in self.arguments.iter() {
+            if let Err(e) = arg.typecheck(file_id, context) {
+                diags.extend(e.into_iter().map(|e| {
+                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
+                        .with_message(format!("In command `{}`", self.name))])
+                }))
+            }
+        }
+
+        if diags.is_empty() {
+            Ok(())
+        } else {
+            Err(diags)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
 pub struct Interface {
     pub name: ArcStr,
     pub sm_names: Vec<ArcStr>,
     pub commands: Vec<Command>,
+    #[derivative(PartialEq = "ignore")]
+    pub location: Span,
+}
+
+impl Interface {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+        let mut diags = Vec::new();
+
+        let mut command_names = BTreeMap::new();
+        let mut command_ids = BTreeMap::new();
+
+        for command in self.commands.iter() {
+            if let Err(e) = command.typecheck(file_id, context) {
+                diags.extend(e.into_iter().map(|e| {
+                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
+                        .with_message(format!("In interface `{}`", self.name))])
+                }))
+            }
+
+            match command_names.entry(&command.name) {
+                Entry::Vacant(v) => {
+                    v.insert(command);
+                }
+                Entry::Occupied(o) => diags.push(
+                    Diagnostic::error()
+                        .with_message(format!("Duplicate command named `{}`", command.name))
+                        .with_labels(vec![
+                            Label::primary(file_id, command.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previous definition here"),
+                            Label::secondary(file_id, self.location.clone())
+                                .with_message(format!("In interface `{}`", self.name)),
+                        ]),
+                ),
+            }
+
+            match command_ids.entry(command.id) {
+                Entry::Vacant(v) => {
+                    v.insert(command);
+                }
+                Entry::Occupied(o) => diags.push(
+                    Diagnostic::error()
+                        .with_message(format!("Duplicate command with id `{}`", command.id))
+                        .with_labels(vec![
+                            Label::primary(file_id, command.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previous definition here"),
+                            Label::secondary(file_id, self.location.clone())
+                                .with_message(format!("In interface `{}`", self.name)),
+                        ]),
+                ),
+            }
+        }
+
+        if diags.is_empty() {
+            Ok(())
+        } else {
+            Err(diags)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Derivative)]
@@ -659,11 +734,7 @@ pub enum TypeWithName {
 }
 
 impl TypeWithName {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        context: &BTreeMap<ArcStr, TypeWithName>,
-    ) -> Result<()> {
+    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
         match self {
             TypeWithName::TypeAlias(t) => {
                 t.referenced_type.resolve(file_id, context)?;
@@ -697,6 +768,50 @@ impl TypeWithName {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct TypecheckContext {
+    pub named_types: BTreeMap<ArcStr, TypeWithName>,
+    pub interfaces: BTreeMap<ArcStr, Arc<Interface>>,
+}
+
+impl TypecheckContext {
+    pub fn resolve_type(
+        &self,
+        name: &ArcStr,
+        file_id: usize,
+        reference_location: &Span,
+    ) -> Result<TypeWithName> {
+        if let Some(t) = self.named_types.get(name) {
+            Ok(t.clone())
+        } else {
+            return Err(vec![Diagnostic::error()
+                .with_message(format!("Could not resolve type named `{}`", name))
+                .with_labels(vec![Label::primary(
+                    file_id,
+                    reference_location.clone(),
+                )])]);
+        }
+    }
+
+    pub fn resolve_interface(
+        &self,
+        name: &ArcStr,
+        file_id: usize,
+        reference_location: &Span,
+    ) -> Result<Arc<Interface>> {
+        if let Some(t) = self.interfaces.get(name) {
+            Ok(t.clone())
+        } else {
+            return Err(vec![Diagnostic::error()
+                .with_message(format!("Could not resolve interface named `{}`", name))
+                .with_labels(vec![Label::primary(
+                    file_id,
+                    reference_location.clone(),
+                )])]);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct IpcFile {
     items: Vec<IpcFileItem>,
     resolved_type_names: BTreeMap<ArcStr, StructuralType>,
@@ -706,8 +821,9 @@ pub struct IpcFile {
 impl IpcFile {
     pub fn try_new(file_id: usize, items: Vec<IpcFileItem>) -> Result<Self> {
         let mut named_types = BTreeMap::new();
+        let mut interfaces = BTreeMap::new();
 
-        let mut diagnostics = Vec::new();
+        let diagnostics = RefCell::new(Vec::new());
 
         let mut try_add_named_type = |ty: TypeWithName| {
             let name = ty.name().clone();
@@ -717,7 +833,7 @@ impl IpcFile {
                     vac.insert(ty);
                 }
                 Entry::Occupied(occ) => {
-                    diagnostics.push(
+                    diagnostics.borrow_mut().push(
                         Diagnostic::error()
                             .with_message(format!("Multiple definitions of type `{}`", name))
                             .with_labels(vec![
@@ -730,6 +846,26 @@ impl IpcFile {
                 }
             }
         };
+
+        let mut try_add_interface =
+            |interface: Arc<Interface>| match interfaces.entry(interface.name.clone()) {
+                Entry::Vacant(v) => {
+                    v.insert(interface);
+                }
+                Entry::Occupied(o) => diagnostics.borrow_mut().push(
+                    Diagnostic::error()
+                        .with_message(format!(
+                            "Multiple definitions of interface `{}`",
+                            interface.name
+                        ))
+                        .with_labels(vec![
+                            Label::primary(file_id, interface.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone()).with_message(
+                                format!("Previous definition of interface `{}`", interface.name),
+                            ),
+                        ]),
+                ),
+            };
 
         for item in items.iter() {
             match item {
@@ -745,12 +881,25 @@ impl IpcFile {
                 IpcFileItem::BitflagsDef(b) => {
                     try_add_named_type(TypeWithName::BitflagsDef(b.clone()));
                 }
-                IpcFileItem::InterfaceDef(_) => {}
+                IpcFileItem::InterfaceDef(i) => try_add_interface(i.clone()),
             }
         }
 
-        for (_, named_type) in named_types.iter() {
-            if let Err(e) = named_type.typecheck(file_id, &named_types) {
+        let mut diagnostics = diagnostics.take();
+
+        let context = TypecheckContext {
+            named_types,
+            interfaces,
+        };
+
+        for (_, named_type) in context.named_types.iter() {
+            if let Err(e) = named_type.typecheck(file_id, &context) {
+                diagnostics.extend(e);
+            }
+        }
+
+        for (_, interface) in context.interfaces.iter() {
+            if let Err(e) = interface.typecheck(file_id, &context) {
                 diagnostics.extend(e);
             }
         }

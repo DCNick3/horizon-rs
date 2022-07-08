@@ -414,4 +414,54 @@ bitflags test : u8 {
         "#;
         unwrap_err_parse(s, parse_ipc_file, "Duplicate bitfield arm named `one`");
     }
+
+    #[test]
+    fn interface_duplicate_id_file() {
+        let s = r#"
+interface ITest {
+    [1] Lol();
+    [1] Kek();
+}
+        "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate command with id `1`");
+    }
+
+    #[test]
+    fn interface_duplicate_name_file() {
+        let s = r#"
+interface ITest {
+    [1] Lol();
+    [2] Lol();
+}
+        "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate command named `Lol`");
+    }
+
+    #[test]
+    fn interface_undef_type_file() {
+        let s = r#"
+interface ITest {
+    [1] Lol(undefined_type hello);
+}
+        "#;
+        unwrap_err_parse(
+            s,
+            parse_ipc_file,
+            "Could not resolve type named `undefined_type`",
+        );
+    }
+
+    #[test]
+    fn interface_undef_interface_file() {
+        let s = r#"
+interface ITest {
+    [1] Lol(sf::SharedPointer<ISomeUndefinedInterface> hello);
+}
+        "#;
+        unwrap_err_parse(
+            s,
+            parse_ipc_file,
+            "Could not resolve interface named `ISomeUndefinedInterface`",
+        );
+    }
 }

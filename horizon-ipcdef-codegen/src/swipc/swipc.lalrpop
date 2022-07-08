@@ -169,8 +169,8 @@ Value: Value = {
 
     "sf::InNonSecureAutoSelectBuffer" => Value::InBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::AllowNonSecure),
 
-    "sf::Out" "<" "sf::SharedPointer" "<" "sf::IUnknown" ">" ">" => Value::OutObject(None),
-    "sf::Out" "<" "sf::SharedPointer" "<" <iface:Ident> ">" ">" => Value::OutObject(Some(iface)),
+    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> "sf::IUnknown" <r:@R> ">" ">" => Value::OutObject(None, l..r),
+    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" ">" => Value::OutObject(Some(iface), l..r),
     "sf::Out" "<" <t:NominalType> ">" => Value::Out(t),
 
     "sf::OutBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
@@ -192,7 +192,7 @@ Value: Value = {
     "sf::OutPointerArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::Pointer)),
     "sf::OutAutoSelectArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::AutoSelect)),
 
-    "sf::SharedPointer" "<" <iface:Ident> ">" => Value::InObject(iface),
+    "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" => Value::InObject(iface, l..r),
     <t:NominalType> => Value::In(t),
 };
 
@@ -224,21 +224,27 @@ CommandDecorator: () = {
 Command: Command =
     CommandDocs
     CommandDecorator*
+    <l:@L>
     "[" <id:Num> "]" <name:LocalIdent>
         "(" <arguments:Comma<InputSpec>> ")"
+    <r:@R>
     => Command {
         id: id.try_into().unwrap(),
         name,
         arguments,
+        location: l..r,
     };
 
 pub InterfaceDef: Interface =
+    <l:@L>
     "interface" <name:Ident> <sm_names:("is" <Comma<Ident>>)?> "{"
         <commands:(<Command> ";")*>
-    "}" => Interface {
+    "}"
+    <r:@R> => Interface {
         name,
         sm_names: sm_names.unwrap_or_default(),
         commands,
+        location: l..r,
     };
 
 pub Item: IpcFileItem = {
