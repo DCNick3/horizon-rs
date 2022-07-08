@@ -67,7 +67,8 @@ fn make_diagnostics<'source>(
 #[cfg(test)]
 mod tests {
     use crate::swipc::model::{
-        BufferTransferMode, IntType, Interface, IpcFile, NominalType, Span, Struct, TypeAlias,
+        BufferTransferMode, IntType, Interface, IpcFile, NominalType, Span, Struct, StructField,
+        TypeAlias,
     };
     use crate::swipc::{make_diagnostics, parser};
     use codespan_reporting::diagnostic::Diagnostic;
@@ -155,7 +156,7 @@ mod tests {
             r"
                 struct some_struct {
                     u8 bla;
-                    sf::Bytes<0x100> buffer_;
+                    sf::Bytes<0x100> buffer;
                 };",
             parse_struct_def,
         );
@@ -166,14 +167,19 @@ mod tests {
                 is_large_data: false,
                 preferred_transfer_mode: None,
                 fields: vec![
-                    (arcstr::literal!("bla"), NominalType::Int(IntType::U8)),
-                    (
-                        arcstr::literal!("buffer_"),
-                        NominalType::Bytes {
+                    StructField {
+                        name: arcstr::literal!("bla"),
+                        ty: NominalType::Int(IntType::U8),
+                        location: Span::default(),
+                    },
+                    StructField {
+                        name: arcstr::literal!("buffer"),
+                        ty: NominalType::Bytes {
                             size: 0x100,
                             alignment: 0x1,
-                        }
-                    ),
+                        },
+                        location: Span::default(),
+                    },
                 ],
                 location: Span::default(),
             }
@@ -186,7 +192,7 @@ mod tests {
             r"
                 struct some_struct : sf::LargeData, sf::PrefersPointerTransferMode {
                     u8 bla;
-                    sf::Bytes<0x100> buffer_;
+                    sf::Bytes<0x100> buffer;
                 };",
             parse_struct_def,
         );
@@ -197,14 +203,19 @@ mod tests {
                 is_large_data: true,
                 preferred_transfer_mode: Some(BufferTransferMode::Pointer),
                 fields: vec![
-                    (arcstr::literal!("bla"), NominalType::Int(IntType::U8)),
-                    (
-                        arcstr::literal!("buffer_"),
-                        NominalType::Bytes {
+                    StructField {
+                        name: arcstr::literal!("bla"),
+                        ty: NominalType::Int(IntType::U8),
+                        location: Span::default(),
+                    },
+                    StructField {
+                        name: arcstr::literal!("buffer"),
+                        ty: NominalType::Bytes {
                             size: 0x100,
                             alignment: 0x1,
-                        }
-                    ),
+                        },
+                        location: Span::default(),
+                    },
                 ],
                 location: Span::default(),
             }
@@ -342,7 +353,7 @@ enum test : u8 {
     }
 
     #[test]
-    fn enum_duplicate_file() {
+    fn enum_duplicate_val_file() {
         let s = r#"
 enum test : u8 {
     one_1 = 1,
@@ -352,10 +363,55 @@ enum test : u8 {
     two_2 = 2,
 };
         "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate enum value");
+    }
+
+    #[test]
+    fn enum_duplicate_name_file() {
+        let s = r#"
+enum test : u8 {
+    name = 1,
+    name = 2,
+};
+        "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate enum arm named `name`");
+    }
+
+    #[test]
+    fn struct_duplicate_file() {
+        let s = r#"
+struct test {
+    u8 one;
+    u16 one;
+};
+        "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate struct field `one`");
+    }
+
+    #[test]
+    fn bitflags_overflow_file() {
+        let s = r#"
+bitflags test : u8 {
+    ok1 = 1,
+    large = 256,
+    ok2 = 1,
+};
+        "#;
         unwrap_err_parse(
             s,
             parse_ipc_file,
-            "Value 1 of enum arm `one_2` is the same as value in arm `one_1`",
+            "Value 256 of bitflags arm `large` does not fit into type U8",
         );
+    }
+
+    #[test]
+    fn bitflags_duplicate_file() {
+        let s = r#"
+bitflags test : u8 {
+    one = 1,
+    one = 2,
+};
+        "#;
+        unwrap_err_parse(s, parse_ipc_file, "Duplicate bitfield arm named `one`");
     }
 }

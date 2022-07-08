@@ -3,7 +3,12 @@ use std::sync::Arc;
 use arcstr::ArcStr;
 use lalrpop_util::ParseError;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
-use crate::swipc::model::{NominalType, IntType, Struct, Enum, Bitflags, Interface, Command, Value, HandleTransferType, BufferTransferMode, StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias, IpcFile};
+use crate::swipc::model::{
+    NominalType, IntType, Struct, Enum, Bitflags, Interface,
+    Command, Value, HandleTransferType, BufferTransferMode,
+    StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias,
+    IpcFile, StructField, EnumArm, BitflagsArm
+};
 
 grammar(file_id: usize);
 
@@ -61,11 +66,15 @@ StructMarker: StructMarker = {
 pub StructDef: Struct =
     <l:@L>
     "struct" <name:Ident> <markers:(":" <Comma<StructMarker>>)?> "{"
-        <fields:(<NominalType> <LocalIdent> ";")*>
+        <fields:(<@L> <NominalType> <LocalIdent> <@R>";")*>
     "}" ";"
     <r:@R> =>? Struct::try_new(
                 name,
-                fields.into_iter().map(|(t, n)| (n, t)).collect(),
+                fields.into_iter().map(|(l, ty, name, r)| StructField {
+                    name,
+                    ty,
+                    location: l..r,
+                }).collect(),
                 markers.unwrap_or_default(),
                 l..r
             ).map_err(|error| ParseError::User {
@@ -75,10 +84,19 @@ pub StructDef: Struct =
                          .collect(),
                  });
 
+pub EnumArm: EnumArm =
+    <l:@L>
+    <name:LocalIdent> "=" <value:Num>
+    <r:@R> => EnumArm {
+        name,
+        value,
+        location: l..r,
+    };
+
 pub EnumDef: Enum =
     <l:@L>
     "enum" <name:Ident> ":" <base_type:IntType> "{"
-        <arms:Comma<(<LocalIdent> "=" <Num>)>>
+        <arms:Comma<EnumArm>>
     "}" ";"
     <r:@R> => Enum {
         name,
@@ -87,10 +105,19 @@ pub EnumDef: Enum =
         location: l..r
     };
 
+pub BitflagsArm: BitflagsArm =
+    <l:@L>
+    <name:LocalIdent> "=" <value:Num>
+    <r:@R> => BitflagsArm {
+        name,
+        value,
+        location: l..r,
+    };
+
 pub BitflagsDef: Bitflags =
     <l:@L>
     "bitflags" <name:Ident> ":" <base_type:IntType> "{"
-        <arms:Comma<(<LocalIdent> "=" <Num>)>>
+        <arms:Comma<BitflagsArm>>
     "}" ";"
     <r:@R> => Bitflags {
         name,

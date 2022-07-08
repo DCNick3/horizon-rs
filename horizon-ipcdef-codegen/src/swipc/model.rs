@@ -308,11 +308,49 @@ impl StructMarker {
 
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
+pub struct StructField {
+    pub name: ArcStr,
+    pub ty: NominalType,
+    #[derivative(PartialEq = "ignore")]
+    pub location: Span,
+}
+
+impl StructField {
+    pub fn typecheck(
+        &self,
+        file_id: usize,
+        context: &BTreeMap<ArcStr, TypeWithName>,
+    ) -> Result<()> {
+        match self.ty.resolve(file_id, context) {
+            Ok(t) => {
+                if !t.is_sized() {
+                    return Err(vec![Diagnostic::error()
+                        .with_message(format!("Use of unsized type in field `{}`", self.name))
+                        .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+                }
+
+                Ok(())
+            }
+            Err(e) => {
+                return Err(e
+                    .into_iter()
+                    .map(|e| {
+                        e.with_labels(vec![Label::secondary(file_id, self.location.clone())
+                            .with_message(format!("In field `{}`", self.name))])
+                    })
+                    .collect())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
 pub struct Struct {
     pub name: ArcStr,
     pub is_large_data: bool,
     pub preferred_transfer_mode: Option<BufferTransferMode>,
-    pub fields: Vec<(ArcStr, NominalType)>,
+    pub fields: Vec<StructField>,
     #[derivative(PartialEq = "ignore")]
     pub location: Span,
 }
@@ -320,7 +358,7 @@ pub struct Struct {
 impl Struct {
     pub fn try_new(
         name: ArcStr,
-        fields: Vec<(ArcStr, NominalType)>,
+        fields: Vec<StructField>,
         markers: Vec<StructMarker>,
         location: Span,
     ) -> Result<Self> {
@@ -367,24 +405,30 @@ impl Struct {
         context: &BTreeMap<ArcStr, TypeWithName>,
     ) -> Result<()> {
         let mut diags = Vec::new();
-        for (name, ty) in self.fields.iter() {
-            match ty.resolve(file_id, context) {
-                Ok(t) => {
-                    if !t.is_sized() {
-                        diags.push(
-                            Diagnostic::error()
-                                .with_message(format!("Use of unsized type in field `{}`", name))
-                                .with_labels(vec![Label::primary(file_id, self.location.clone())]),
-                        );
-                    }
+
+        let mut fields = BTreeMap::new();
+
+        for field in self.fields.iter() {
+            match fields.entry(&field.name) {
+                Entry::Vacant(v) => {
+                    v.insert(field);
                 }
-                Err(e) => diags.extend(e.into_iter().map(|e| {
+                Entry::Occupied(o) => diags.push(
+                    Diagnostic::error()
+                        .with_message(format!("Duplicate struct field `{}`", field.name,))
+                        .with_labels(vec![
+                            Label::primary(file_id, field.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previously defined here"),
+                        ]),
+                ),
+            }
+
+            if let Err(e) = field.typecheck(file_id, context) {
+                diags.extend(e.into_iter().map(|e| {
                     e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!(
-                            "In field `{}` of struct `{}`",
-                            name, self.name
-                        ))])
-                })),
+                        .with_message(format!("In struct `{}`", self.name))])
+                }))
             }
         }
 
@@ -398,10 +442,38 @@ impl Struct {
 
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
+pub struct EnumArm {
+    pub name: ArcStr,
+    pub value: u64,
+    #[derivative(PartialEq = "ignore")]
+    pub location: Span,
+}
+
+impl EnumArm {
+    pub fn typecheck(
+        &self,
+        file_id: usize,
+        _context: &BTreeMap<ArcStr, TypeWithName>,
+        base_type: IntType,
+    ) -> Result<()> {
+        if !base_type.fits_u64(self.value) {
+            return Err(vec![Diagnostic::error()
+                .with_message(format!(
+                    "Value {} of enum arm `{}` does not fit into type {:?}",
+                    self.value, self.name, base_type
+                ))
+                .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
 pub struct Enum {
     pub name: ArcStr,
     pub base_type: IntType,
-    pub arms: Vec<(ArcStr, u64)>,
+    pub arms: Vec<EnumArm>,
     #[derivative(PartialEq = "ignore")]
     pub location: Span,
 }
@@ -410,37 +482,48 @@ impl Enum {
     pub fn typecheck(
         &self,
         file_id: usize,
-        _context: &BTreeMap<ArcStr, TypeWithName>,
+        context: &BTreeMap<ArcStr, TypeWithName>,
     ) -> Result<()> {
         let mut diags = Vec::new();
 
-        let mut arm_values: BTreeMap<u64, &ArcStr> = BTreeMap::new();
+        let mut arm_values: BTreeMap<u64, &EnumArm> = BTreeMap::new();
+        let mut arm_names: BTreeMap<&ArcStr, &EnumArm> = BTreeMap::new();
 
-        for (name, value) in self.arms.iter() {
-            if !self.base_type.fits_u64(*value) {
-                diags.push(
-                    Diagnostic::error()
-                        .with_message(format!(
-                            "Value {} of enum arm `{}` does not fit into type {:?}",
-                            value, name, self.base_type
-                        ))
-                        .with_labels(vec![Label::primary(file_id, self.location.clone())]),
-                )
+        for arm in self.arms.iter() {
+            if let Err(e) = arm.typecheck(file_id, context, self.base_type) {
+                diags.extend(e.into_iter().map(|e| {
+                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
+                        .with_message(format!("In enum `{}`", self.name))])
+                }))
             }
 
-            match arm_values.entry(*value) {
+            match arm_values.entry(arm.value) {
                 Entry::Vacant(e) => {
-                    e.insert(name);
+                    e.insert(arm);
                 }
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
-                        .with_message(format!(
-                            "Value {} of enum arm `{}` is the same as value in arm `{}`",
-                            value,
-                            name,
-                            o.get()
-                        ))
-                        .with_labels(vec![Label::primary(file_id, self.location.clone())]),
+                        .with_message(format!("Duplicate enum value",))
+                        .with_labels(vec![
+                            Label::primary(file_id, arm.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previously defined here"),
+                        ]),
+                ),
+            }
+
+            match arm_names.entry(&arm.name) {
+                Entry::Vacant(e) => {
+                    e.insert(arm);
+                }
+                Entry::Occupied(o) => diags.push(
+                    Diagnostic::error()
+                        .with_message(format!("Duplicate enum arm named `{}`", arm.name,))
+                        .with_labels(vec![
+                            Label::primary(file_id, arm.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previously defined here"),
+                        ]),
                 ),
             }
         }
@@ -455,10 +538,38 @@ impl Enum {
 
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
+pub struct BitflagsArm {
+    pub name: ArcStr,
+    pub value: u64,
+    #[derivative(PartialEq = "ignore")]
+    pub location: Span,
+}
+
+impl BitflagsArm {
+    pub fn typecheck(
+        &self,
+        file_id: usize,
+        _context: &BTreeMap<ArcStr, TypeWithName>,
+        base_type: IntType,
+    ) -> Result<()> {
+        if !base_type.fits_u64(self.value) {
+            return Err(vec![Diagnostic::error()
+                .with_message(format!(
+                    "Value {} of bitflags arm `{}` does not fit into type {:?}",
+                    self.value, self.name, base_type
+                ))
+                .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq)]
 pub struct Bitflags {
     pub name: ArcStr,
     pub base_type: IntType,
-    pub arms: Vec<(ArcStr, u64)>,
+    pub arms: Vec<BitflagsArm>,
     #[derivative(PartialEq = "ignore")]
     pub location: Span,
 }
@@ -467,19 +578,33 @@ impl Bitflags {
     pub fn typecheck(
         &self,
         file_id: usize,
-        _context: &BTreeMap<ArcStr, TypeWithName>,
+        context: &BTreeMap<ArcStr, TypeWithName>,
     ) -> Result<()> {
         let mut diags = Vec::new();
-        for (name, value) in self.arms.iter() {
-            if !self.base_type.fits_u64(*value) {
-                diags.push(
+
+        let mut arm_names: BTreeMap<&ArcStr, &BitflagsArm> = BTreeMap::new();
+
+        for arm in self.arms.iter() {
+            if let Err(e) = arm.typecheck(file_id, context, self.base_type) {
+                diags.extend(e.into_iter().map(|e| {
+                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
+                        .with_message(format!("In bitflags `{}`", self.name))])
+                }))
+            }
+
+            match arm_names.entry(&arm.name) {
+                Entry::Vacant(e) => {
+                    e.insert(arm);
+                }
+                Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
-                        .with_message(format!(
-                            "Value {} of bitfield arm `{}` does not fit into type {:?}",
-                            value, name, self.base_type
-                        ))
-                        .with_labels(vec![Label::primary(file_id, self.location.clone())]),
-                )
+                        .with_message(format!("Duplicate bitfield arm named `{}`", arm.name,))
+                        .with_labels(vec![
+                            Label::primary(file_id, arm.location.clone()),
+                            Label::secondary(file_id, o.get().location.clone())
+                                .with_message("Previously defined here"),
+                        ]),
+                ),
             }
         }
 
