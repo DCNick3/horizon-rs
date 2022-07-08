@@ -16,3 +16,9 @@ py_literal = "0.4.0"
 anyhow = "1.0.58"
 tokio = "1.19.2"
 app_dirs2 = "2.5.1"
+arcstr = "1.1.4"
+lalrpop-util = { version = "0.19.8", features = ["lexer"] }
+codespan-reporting = "0.11.1"
+
+[build-dependencies]
+lalrpop = "0.19.8"

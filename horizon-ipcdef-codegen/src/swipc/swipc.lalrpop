@@ -1,0 +1,177 @@
+use std::str::FromStr;
+use std::sync::Arc;
+use arcstr::ArcStr;
+use lalrpop_util::ParseError;
+use crate::swipc::model::{Type, IntType, Struct, Enum, Bitflags, Interface, Command, Value, HandleType, HandleTransferType, BufferType};
+
+grammar;
+
+Num: u64 = {
+    <s:r"[0-9]+"> => u64::from_str(s).unwrap(),
+    <s:r"0x[0-9a-fA-F]+"> => u64::from_str_radix(&s[2..], 16).unwrap()
+};
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e { // (2)
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+Ident: ArcStr = <s:r"[a-zA-Z_][a-zA-Z\d_\-:]*"> => ArcStr::from(s);
+
+LocalIdent: ArcStr = <s:Ident> => {
+    assert!(!s.contains(':'), "Local identifier can't have ':' in it");
+    assert!(!s.contains('-'), "Local identifier can't have '-' in it");
+    ArcStr::from(s)
+};
+
+IntType: IntType = {
+    "u8" => IntType::U8,
+    "u16" => IntType::U16,
+    "u32" => IntType::U32,
+    "u64" => IntType::U64,
+    "i8" => IntType::I8,
+    "i16" => IntType::I16,
+    "i32" => IntType::I32,
+    "i64" => IntType::I64,
+};
+
+Struct: Struct =
+    "struct" "{"
+        <fields:(<NominalType> <LocalIdent> ";")*>
+    "}" => Struct {
+        fields: fields.into_iter().map(|(t, n)| (n, t)).collect(),
+    };
+
+Enum: Enum =
+    "enum" "<" <base_type:IntType> ">" "{"
+        <arms:(<LocalIdent> "=" <Num> ";")*>
+    "}" => Enum {
+        base_type,
+        arms,
+    };
+
+Bitflags: Bitflags =
+    "bitflags" "<" <base_type:IntType> ">" "{"
+        <arms:(<LocalIdent> "=" <Num> ";")*>
+    "}" => Bitflags {
+        base_type,
+        arms,
+    };
+
+/// Nominal type is (kind of) a type name
+/// It does not allow using structures (and other compound types) directly, only by its name
+/// This distinction is added because rust does not allow unnamed structures, but swipc syntax (kind of) does
+NominalType: Type = {
+    <ty:IntType> => Type::Int(ty),
+    "b8" => Type::Bool,
+    "f32" => Type::F32,
+    "bytes" "<" <size:Num> ">" => Type::Bytes { size, alignment: 1 },
+    "bytes" "<" <size:Num> "," <alignment:Num> ">" => Type::Bytes { size, alignment },
+    "unknown" <size:("<" <Num> ">")?> => Type::Unknown { size },
+    <i:Ident> => Type::Typedef(i),
+};
+
+Type: Type = {
+    <nom:NominalType> => nom,
+    <s:Struct> => Type::Struct(s),
+    <e:Enum> => Type::Enum(e),
+    <b:Bitflags> => Type::Bitflags(b),
+};
+
+pub Typedef: (ArcStr, Type) = "type" <name:Ident> "=" <ty:Type> ";" => (name, ty);
+
+HandleTransferType: HandleTransferType = {
+    "copy" => HandleTransferType::Copy,
+    "move" => HandleTransferType::Move,
+};
+
+HandleType: HandleType = {
+    "session" => HandleType::Session,
+    "port" => HandleType::Port,
+};
+
+BufferTransferType: BufferType = {
+    <type_id:Num> =>? {
+        BufferType::try_from_id(type_id)
+            .map_err(|_| ParseError::User {
+                        error: "buffer type is unknown"
+                    })
+    }
+}
+
+Value: Value = {
+    <t:NominalType> => Value::LiteralValue(t),
+    "pid" => Value::Pid,
+    "handle" "<" <transfer_type:HandleTransferType> <ty:("," <HandleType>)?> ">" => Value::Handle {
+        transfer_type,
+        ty,
+    },
+    "buffer" "<" <transfer_type:BufferTransferType> <size:("," <Num>)?> ">" => Value::Buffer {
+        transfer_type,
+        size,
+    },
+    "array" "<" <ty:NominalType> "," <transfer_type:BufferTransferType> ">" => Value::Array {
+        ty,
+        transfer_type,
+    },
+    "object" "<" "unknown" ">" => Value::Object { interface_name: None },
+    "object" "<" <interface:Ident> ">" => Value::Object { interface_name: Some(interface) },
+};
+
+InputSpec: (Option<ArcStr>, Arc<Value>) = {
+    <v:Value> => (None, Arc::new(v)),
+    <v:Value> <n:LocalIdent> => (Some(n), Arc::new(v)),
+};
+
+OutputsSpec: Vec<(Option<ArcStr>, Arc<Value>)> = {
+    <v:Value> => vec![(None, Arc::new(v))],
+    <v:Value> <n:LocalIdent> => vec![(Some(n), Arc::new(v))],
+    "(" <v:Comma<InputSpec>> ")" => v,
+};
+
+CommandDocs: () = {
+    (r"#[^\n]*")*
+};
+
+Version: () =
+    <major:Num> "."
+    <minor:Num> "."
+    <micro:Num> => ();
+
+VersionSpec: () = {
+    Version,
+    Version "+",
+    Version "-" Version,
+};
+
+CommandDecorator: () = {
+    "@" "version" "(" VersionSpec ")",
+    "@" "undocumented",
+};
+
+Command: Command =
+    CommandDocs
+    CommandDecorator*
+    "[" <id:Num> "]" <name:LocalIdent>
+        "(" <inputs:Comma<InputSpec>> ")"
+        <outputs:("->" <OutputsSpec>)?>
+    => Command {
+        id: id.try_into().unwrap(),
+        name,
+        inputs,
+        outputs: outputs.unwrap_or_default(),
+    };
+
+pub Interface: Interface =
+    "interface" <name:Ident> <sm_names:("is" <Comma<Ident>>)?> "{"
+        <commands:(<Command> ";")*>
+    "}" => Interface {
+        name,
+        sm_names: sm_names.unwrap_or_default(),
+        commands,
+    };

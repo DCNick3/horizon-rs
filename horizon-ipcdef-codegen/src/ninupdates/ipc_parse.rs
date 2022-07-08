@@ -212,7 +212,7 @@ impl IpcMethod {
 
 #[cfg(test)]
 mod tests {
-    use crate::ipc_parse::{IpcFile, IpcMethod};
+    use crate::ninupdates::ipc_parse::{IpcFile, IpcMethod};
 
     fn try_parse_ipc_method(s: &str) {
         match IpcMethod::parse(s) {

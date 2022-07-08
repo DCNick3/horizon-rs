@@ -1,5 +1,6 @@
 mod ninupdates;
 pub mod reqwest_client;
+mod swipc;
 
 use crate::ninupdates::Region;
 use app_dirs2::AppInfo;

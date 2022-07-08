@@ -6,11 +6,11 @@ use core::fmt::{Debug, Display, Formatter};
 /// Must be ASCII (all bytes < 0x80)
 #[repr(C, align(8))]
 #[derive(PartialEq, Eq)]
-pub struct SmServiceName {
+pub struct ServiceName {
     name: [u8; 8],
 }
 
-impl SmServiceName {
+impl ServiceName {
     pub fn try_new(name: &str) -> Option<Self> {
         if name.bytes().len() >= 8 {
             return None;
@@ -48,7 +48,7 @@ impl SmServiceName {
     }
 }
 
-impl Debug for SmServiceName {
+impl Debug for ServiceName {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("SmServiceName")
             .field(&self.as_str())
@@ -56,13 +56,13 @@ impl Debug for SmServiceName {
     }
 }
 
-impl Display for SmServiceName {
+impl Display for ServiceName {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl WriteAsBytes for SmServiceName {
+impl WriteAsBytes for ServiceName {
     fn write_as_bytes(&self, dest: &mut (impl Writer + ?Sized)) {
         dest.write_bytes(&self.name);
     }
