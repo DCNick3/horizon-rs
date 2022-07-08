@@ -2,17 +2,8 @@ mod ninupdates;
 pub mod reqwest_client;
 
 use crate::ninupdates::Region;
-use app_dirs2::{AppDataType, AppInfo};
-use once_cell::sync::Lazy;
-use regex::Regex;
-use reqwest::{Client, IntoUrl};
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_middleware_cache::managers::CACacheManager;
-use reqwest_middleware_cache::{Cache, CacheMode};
-use scraper::{Html, Selector};
+use app_dirs2::AppInfo;
 use std::collections::HashSet;
-use std::fmt::{Debug, Display, Formatter};
-use std::str::FromStr;
 
 const APP_INFO: AppInfo = AppInfo {
     name: "horizon-ipcdef-codegen",

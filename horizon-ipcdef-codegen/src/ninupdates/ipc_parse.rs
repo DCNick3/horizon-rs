@@ -24,7 +24,7 @@ impl IpcFile {
         let s = PY_COMMENT_REGEX.replace_all(&s, "");
 
         // py_literal does not support newlines, sooooo
-        let s = s.replace("\n", " ");
+        let s = s.replace('\n', " ");
 
         let lit = Value::from_str(&s).context("Parsing IpcFile as a python literal")?;
 

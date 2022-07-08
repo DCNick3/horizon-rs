@@ -1,7 +1,5 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use reqwest::IntoUrl;
-use reqwest_middleware::ClientWithMiddleware;
 use scraper::{Html, Selector};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -61,7 +59,7 @@ impl FileId {
             date: c.name("date").unwrap().as_str().to_string(),
             title_id: u64::from_str_radix(c.name("title_id").unwrap().as_str(), 16).unwrap(),
             region: Region::parse(c.name("region").unwrap().as_str())?,
-            version: u32::from_str(&c.name("version").unwrap().as_str()).unwrap(),
+            version: u32::from_str(c.name("version").unwrap().as_str()).unwrap(),
             filename: c.name("file").unwrap().as_str().to_string(),
         })
     }
@@ -107,13 +105,11 @@ pub fn get_file_list() -> Vec<FileId> {
             // ignore for now
             if let Some(file_id) = FileId::parse(href) {
                 res.push(file_id);
-            } else {
-                if href.starts_with("sysupdatedl") {
-                    eprintln!(
-                        "Skipping potential file due to unsupported path format: {}",
-                        href
-                    )
-                }
+            } else if href.starts_with("sysupdatedl") {
+                eprintln!(
+                    "Skipping potential file due to unsupported path format: {}",
+                    href
+                )
             }
         }
     }
