@@ -2,9 +2,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 use arcstr::ArcStr;
 use lalrpop_util::ParseError;
-use crate::swipc::model::{Type, IntType, Struct, Enum, Bitflags, Interface, Command, Value, HandleType, HandleTransferType, BufferType};
+use codespan_reporting::diagnostic::{Diagnostic, Label};
+use crate::swipc::model::{NominalType, IntType, Struct, Enum, Bitflags, Interface, Command, Value, HandleTransferType, BufferTransferMode, StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias, IpcFile};
 
-grammar;
+grammar(file_id: usize);
+
+extern {
+    type Error = Vec<Diagnostic<usize>>;
+}
 
 Num: u64 = {
     <s:r"[0-9]+"> => u64::from_str(s).unwrap(),
@@ -34,104 +39,139 @@ IntType: IntType = {
     "u16" => IntType::U16,
     "u32" => IntType::U32,
     "u64" => IntType::U64,
+
     "i8" => IntType::I8,
     "i16" => IntType::I16,
     "i32" => IntType::I32,
     "i64" => IntType::I64,
+
+    "s8" => IntType::I8,
+    "s16" => IntType::I16,
+    "s32" => IntType::I32,
+    "s64" => IntType::I64,
 };
 
-Struct: Struct =
-    "struct" "{"
+StructMarker: StructMarker = {
+    "sf::LargeData" => StructMarker::LargeData,
+    "sf::PrefersMapAliasTransferMode" => StructMarker::PrefersTransferMode(BufferTransferMode::MapAlias),
+    "sf::PrefersPointerTransferMode" => StructMarker::PrefersTransferMode(BufferTransferMode::Pointer),
+    "sf::PrefersAutoSelectTransferMode" => StructMarker::PrefersTransferMode(BufferTransferMode::AutoSelect),
+};
+
+pub StructDef: Struct =
+    <l:@L>
+    "struct" <name:Ident> <markers:(":" <Comma<StructMarker>>)?> "{"
         <fields:(<NominalType> <LocalIdent> ";")*>
-    "}" => Struct {
-        fields: fields.into_iter().map(|(t, n)| (n, t)).collect(),
-    };
+    "}" ";"
+    <r:@R> =>? Struct::try_new(
+                name,
+                fields.into_iter().map(|(t, n)| (n, t)).collect(),
+                markers.unwrap_or_default(),
+                l..r
+            ).map_err(|error| ParseError::User {
+                     error: error
+                         .into_iter()
+                         .map(|e| e.with_labels(vec![Label::primary(file_id, l..r)]))
+                         .collect(),
+                 });
 
-Enum: Enum =
-    "enum" "<" <base_type:IntType> ">" "{"
-        <arms:(<LocalIdent> "=" <Num> ";")*>
-    "}" => Enum {
+pub EnumDef: Enum =
+    <l:@L>
+    "enum" <name:Ident> ":" <base_type:IntType> "{"
+        <arms:Comma<(<LocalIdent> "=" <Num>)>>
+    "}" ";"
+    <r:@R> => Enum {
+        name,
         base_type,
         arms,
+        location: l..r
     };
 
-Bitflags: Bitflags =
-    "bitflags" "<" <base_type:IntType> ">" "{"
-        <arms:(<LocalIdent> "=" <Num> ";")*>
-    "}" => Bitflags {
+pub BitflagsDef: Bitflags =
+    <l:@L>
+    "bitflags" <name:Ident> ":" <base_type:IntType> "{"
+        <arms:Comma<(<LocalIdent> "=" <Num>)>>
+    "}" ";"
+    <r:@R> => Bitflags {
+        name,
         base_type,
         arms,
+        location: l..r
     };
 
 /// Nominal type is (kind of) a type name
 /// It does not allow using structures (and other compound types) directly, only by its name
 /// This distinction is added because rust does not allow unnamed structures, but swipc syntax (kind of) does
-NominalType: Type = {
-    <ty:IntType> => Type::Int(ty),
-    "b8" => Type::Bool,
-    "f32" => Type::F32,
-    "bytes" "<" <size:Num> ">" => Type::Bytes { size, alignment: 1 },
-    "bytes" "<" <size:Num> "," <alignment:Num> ">" => Type::Bytes { size, alignment },
-    "unknown" <size:("<" <Num> ">")?> => Type::Unknown { size },
-    <i:Ident> => Type::Typedef(i),
+NominalType: NominalType = {
+    <ty:IntType> => NominalType::Int(ty),
+    "b8" => NominalType::Bool,
+    "bool" => NominalType::Bool,
+    "f32" => NominalType::F32,
+    "sf::Bytes" "<" <size:Num> ">" => NominalType::Bytes { size, alignment: 1 },
+    "sf::Bytes" "<" <size:Num> "," <alignment:Num> ">" => NominalType::Bytes { size, alignment },
+    "sf::Unknown" <size:("<" <Num> ">")?> => NominalType::Unknown { size },
+    <l:@L> <i:Ident> <r:@R> => NominalType::TypeName {
+        name: i,
+        reference_location: l..r,
+    },
 };
 
-Type: Type = {
-    <nom:NominalType> => nom,
-    <s:Struct> => Type::Struct(s),
-    <e:Enum> => Type::Enum(e),
-    <b:Bitflags> => Type::Bitflags(b),
-};
-
-pub Typedef: (ArcStr, Type) = "type" <name:Ident> "=" <ty:Type> ";" => (name, ty);
-
-HandleTransferType: HandleTransferType = {
-    "copy" => HandleTransferType::Copy,
-    "move" => HandleTransferType::Move,
-};
-
-HandleType: HandleType = {
-    "session" => HandleType::Session,
-    "port" => HandleType::Port,
-};
-
-BufferTransferType: BufferType = {
-    <type_id:Num> =>? {
-        BufferType::try_from_id(type_id)
-            .map_err(|_| ParseError::User {
-                        error: "buffer type is unknown"
-                    })
-    }
-}
+pub TypeAlias: TypeAlias =
+    <l:@L>
+    "type" <name:Ident> "=" <ty:NominalType> ";"
+    <r:@R> => TypeAlias {
+        name,
+        referenced_type: ty,
+        location: l..r
+    };
 
 Value: Value = {
-    <t:NominalType> => Value::LiteralValue(t),
-    "pid" => Value::Pid,
-    "handle" "<" <transfer_type:HandleTransferType> <ty:("," <HandleType>)?> ">" => Value::Handle {
-        transfer_type,
-        ty,
-    },
-    "buffer" "<" <transfer_type:BufferTransferType> <size:("," <Num>)?> ">" => Value::Buffer {
-        transfer_type,
-        size,
-    },
-    "array" "<" <ty:NominalType> "," <transfer_type:BufferTransferType> ">" => Value::Array {
-        ty,
-        transfer_type,
-    },
-    "object" "<" "unknown" ">" => Value::Object { interface_name: None },
-    "object" "<" <interface:Ident> ">" => Value::Object { interface_name: Some(interface) },
+    "sf::ClientProcessId" => Value::ClientProcessId,
+
+    "sf::CopyHandle" => Value::InHandle(HandleTransferType::Copy),
+    "sf::MoveHandle" => Value::InHandle(HandleTransferType::Move),
+    "sf::OutCopyHandle" => Value::OutHandle(HandleTransferType::Copy),
+    "sf::OutMoveHandle" => Value::OutHandle(HandleTransferType::Move),
+
+    "sf::InBuffer" => Value::InBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
+    "sf::InMapAliasBuffer" => Value::InBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
+    "sf::InPointerBuffer" => Value::InBuffer(BufferTransferMode::Pointer, BufferExtraAttrs::None),
+    "sf::InAutoSelectBuffer" => Value::InBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::None),
+    "sf::InNonSecureBuffer" => Value::InBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::AllowNonSecure),
+    "sf::InNonDeviceBuffer" => Value::InBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::AllowNonDevice),
+
+    "sf::InNonSecureAutoSelectBuffer" => Value::InBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::AllowNonSecure),
+
+    "sf::Out" "<" "sf::SharedPointer" "<" "sf::IUnknown" ">" ">" => Value::OutObject(None),
+    "sf::Out" "<" "sf::SharedPointer" "<" <iface:Ident> ">" ">" => Value::OutObject(Some(iface)),
+    "sf::Out" "<" <t:NominalType> ">" => Value::Out(t),
+
+    "sf::OutBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
+    "sf::OutMapAliasBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
+    "sf::OutPointerBuffer" => Value::OutBuffer(BufferTransferMode::Pointer, BufferExtraAttrs::None),
+    "sf::OutAutoSelectBuffer" => Value::OutBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::None),
+    "sf::OutNonSecureBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::AllowNonSecure),
+    "sf::OutNonDeviceBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::AllowNonDevice),
+
+    "sf::OutNonSecureAutoSelectBuffer" => Value::OutBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::AllowNonSecure),
+
+    "sf::InArray" "<" <t:NominalType> ">" => Value::InArray(t, None),
+    "sf::InMapAliasArray" "<" <t:NominalType> ">" => Value::InArray(t, Some(BufferTransferMode::MapAlias)),
+    "sf::InPointerArray" "<" <t:NominalType> ">" => Value::InArray(t, Some(BufferTransferMode::Pointer)),
+    "sf::InAutoSelectArray" "<" <t:NominalType> ">" => Value::InArray(t, Some(BufferTransferMode::AutoSelect)),
+
+    "sf::OutArray" "<" <t:NominalType> ">" => Value::OutArray(t, None),
+    "sf::OutMapAliasArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::MapAlias)),
+    "sf::OutPointerArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::Pointer)),
+    "sf::OutAutoSelectArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::AutoSelect)),
+
+    "sf::SharedPointer" "<" <iface:Ident> ">" => Value::InObject(iface),
+    <t:NominalType> => Value::In(t),
 };
 
 InputSpec: (Option<ArcStr>, Arc<Value>) = {
     <v:Value> => (None, Arc::new(v)),
     <v:Value> <n:LocalIdent> => (Some(n), Arc::new(v)),
-};
-
-OutputsSpec: Vec<(Option<ArcStr>, Arc<Value>)> = {
-    <v:Value> => vec![(None, Arc::new(v))],
-    <v:Value> <n:LocalIdent> => vec![(Some(n), Arc::new(v))],
-    "(" <v:Comma<InputSpec>> ")" => v,
 };
 
 CommandDocs: () = {
@@ -158,16 +198,14 @@ Command: Command =
     CommandDocs
     CommandDecorator*
     "[" <id:Num> "]" <name:LocalIdent>
-        "(" <inputs:Comma<InputSpec>> ")"
-        <outputs:("->" <OutputsSpec>)?>
+        "(" <arguments:Comma<InputSpec>> ")"
     => Command {
         id: id.try_into().unwrap(),
         name,
-        inputs,
-        outputs: outputs.unwrap_or_default(),
+        arguments,
     };
 
-pub Interface: Interface =
+pub InterfaceDef: Interface =
     "interface" <name:Ident> <sm_names:("is" <Comma<Ident>>)?> "{"
         <commands:(<Command> ";")*>
     "}" => Interface {
@@ -175,3 +213,17 @@ pub Interface: Interface =
         sm_names: sm_names.unwrap_or_default(),
         commands,
     };
+
+pub Item: IpcFileItem = {
+    <t:TypeAlias> => IpcFileItem::TypeAlias(Arc::new(t)),
+    <s:StructDef> => IpcFileItem::StructDef(Arc::new(s)),
+    <e:EnumDef> => IpcFileItem::EnumDef(Arc::new(e)),
+    <b:BitflagsDef> => IpcFileItem::BitflagsDef(Arc::new(b)),
+    <i:InterfaceDef> => IpcFileItem::InterfaceDef(Arc::new(i)),
+};
+
+pub IpcFile: IpcFile = <i:(Item)*> =>?
+ IpcFile::try_new(file_id, i)
+ .map_err(|error| {
+    ParseError::User { error }
+ });
