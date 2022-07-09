@@ -7,7 +7,7 @@ use crate::swipc::model::{
     NominalType, IntType, Struct, Enum, Bitflags, Interface,
     Command, Value, HandleTransferType, BufferTransferMode,
     StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias,
-    IpcFile, StructField, EnumArm, BitflagsArm
+    IpcFile, StructField, EnumArm, BitflagsArm, Span,
 };
 
 grammar(file_id: usize);
@@ -73,10 +73,10 @@ pub StructDef: Struct =
                 fields.into_iter().map(|(l, ty, name, r)| StructField {
                     name,
                     ty,
-                    location: l..r,
+                    location: Span::new(file_id, l, r),
                 }).collect(),
                 markers.unwrap_or_default(),
-                l..r
+                Span::new(file_id, l, r)
             ).map_err(|error| ParseError::User {
                      error: error
                          .into_iter()
@@ -90,7 +90,7 @@ pub EnumArm: EnumArm =
     <r:@R> => EnumArm {
         name,
         value,
-        location: l..r,
+        location: Span::new(file_id, l, r),
     };
 
 pub EnumDef: Enum =
@@ -102,7 +102,7 @@ pub EnumDef: Enum =
         name,
         base_type,
         arms,
-        location: l..r
+        location: Span::new(file_id, l, r)
     };
 
 pub BitflagsArm: BitflagsArm =
@@ -111,7 +111,7 @@ pub BitflagsArm: BitflagsArm =
     <r:@R> => BitflagsArm {
         name,
         value,
-        location: l..r,
+        location: Span::new(file_id, l, r),
     };
 
 pub BitflagsDef: Bitflags =
@@ -123,7 +123,7 @@ pub BitflagsDef: Bitflags =
         name,
         base_type,
         arms,
-        location: l..r
+        location: Span::new(file_id, l, r)
     };
 
 /// Nominal type is (kind of) a type name
@@ -139,7 +139,7 @@ NominalType: NominalType = {
     "sf::Unknown" <size:("<" <Num> ">")?> => NominalType::Unknown { size },
     <l:@L> <i:Ident> <r:@R> => NominalType::TypeName {
         name: i,
-        reference_location: l..r,
+        reference_location: Span::new(file_id, l, r),
     },
 };
 
@@ -149,7 +149,7 @@ pub TypeAlias: TypeAlias =
     <r:@R> => TypeAlias {
         name,
         referenced_type: ty,
-        location: l..r
+        location: Span::new(file_id, l, r)
     };
 
 Value: Value = {
@@ -169,8 +169,8 @@ Value: Value = {
 
     "sf::InNonSecureAutoSelectBuffer" => Value::InBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::AllowNonSecure),
 
-    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> "sf::IUnknown" <r:@R> ">" ">" => Value::OutObject(None, l..r),
-    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" ">" => Value::OutObject(Some(iface), l..r),
+    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> "sf::IUnknown" <r:@R> ">" ">" => Value::OutObject(None, Span::new(file_id, l, r)),
+    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" ">" => Value::OutObject(Some(iface), Span::new(file_id, l, r)),
     "sf::Out" "<" <t:NominalType> ">" => Value::Out(t),
 
     "sf::OutBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
@@ -192,7 +192,7 @@ Value: Value = {
     "sf::OutPointerArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::Pointer)),
     "sf::OutAutoSelectArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::AutoSelect)),
 
-    "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" => Value::InObject(iface, l..r),
+    "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" => Value::InObject(iface, Span::new(file_id, l, r)),
     <t:NominalType> => Value::In(t),
 };
 
@@ -232,7 +232,7 @@ Command: Command =
         id: id.try_into().unwrap(),
         name,
         arguments,
-        location: l..r,
+        location: Span::new(file_id, l, r),
     };
 
 pub InterfaceDef: Interface =
@@ -244,7 +244,7 @@ pub InterfaceDef: Interface =
         name,
         sm_names: sm_names.unwrap_or_default(),
         commands,
-        location: l..r,
+        location: Span::new(file_id, l, r),
     };
 
 pub Item: IpcFileItem = {
@@ -256,7 +256,7 @@ pub Item: IpcFileItem = {
 };
 
 pub IpcFile: IpcFile = <i:(Item)*> =>?
- IpcFile::try_new(file_id, i)
+ IpcFile::try_new(i)
  .map_err(|error| {
     ParseError::User { error }
  });

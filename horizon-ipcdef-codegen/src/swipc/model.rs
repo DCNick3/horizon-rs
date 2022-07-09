@@ -8,8 +8,66 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-pub type Span = Range<usize>;
 type Result<T> = std::result::Result<T, Vec<Diagnostic<usize>>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Span {
+    pub file_id: usize,
+    pub left: usize,
+    pub right: usize,
+}
+
+impl Span {
+    pub fn new(file_id: usize, left: usize, right: usize) -> Self {
+        Self {
+            file_id,
+            left,
+            right,
+        }
+    }
+
+    pub fn range(&self) -> Range<usize> {
+        self.left..self.right
+    }
+
+    pub fn primary_label(&self) -> Label<usize> {
+        Label::primary(self.file_id, self.range())
+    }
+    pub fn secondary_label(&self) -> Label<usize> {
+        Label::secondary(self.file_id, self.range())
+    }
+}
+
+impl From<&Span> for Span {
+    fn from(span: &Span) -> Self {
+        *span
+    }
+}
+
+trait DiagnosticExt<FileId> {
+    fn with_primary_label(self, location: impl Into<Span>) -> Diagnostic<FileId>;
+    fn with_secondary_label(
+        self,
+        location: impl Into<Span>,
+        message: impl Into<String>,
+    ) -> Diagnostic<FileId>;
+}
+
+impl DiagnosticExt<usize> for Diagnostic<usize> {
+    fn with_primary_label(self, location: impl Into<Span>) -> Diagnostic<usize> {
+        let location = location.into();
+        self.with_labels(vec![location.primary_label()])
+    }
+
+    fn with_secondary_label(
+        self,
+        location: impl Into<Span>,
+        message: impl Into<String>,
+    ) -> Diagnostic<usize> {
+        let location = location.into();
+        self.with_labels(vec![location.secondary_label().with_message(message)])
+    }
+}
 
 /// Types are those things that have a known byte representations
 /// Usually they will be sent as-is via the wire (put into the payload), but sometimes (structs with sf::LargeData marker) they would be sent as buffers instead
@@ -38,7 +96,6 @@ pub enum NominalType {
 impl NominalType {
     pub fn resolve_with_depth(
         &self,
-        file_id: usize,
         context: &TypecheckContext,
         depth_limit: usize,
     ) -> Result<StructuralType> {
@@ -51,29 +108,25 @@ impl NominalType {
             NominalType::TypeName {
                 name,
                 reference_location,
-            } => match context.resolve_type(name, file_id, reference_location)? {
+            } => match context.resolve_type(name, reference_location)? {
                 TypeWithName::TypeAlias(t) => {
                     if depth_limit == 0 {
                         return Err(vec![Diagnostic::error()
                             .with_message("Resolve recursion limit exceeded")
-                            .with_labels(vec![Label::primary(file_id, t.location.clone())])]);
+                            .with_primary_label(t.location)]);
                     }
 
                     let ty = t
                         .referenced_type
-                        .resolve_with_depth(file_id, context, depth_limit - 1)
+                        .resolve_with_depth(context, depth_limit - 1)
                         .map_err(|e| {
                             e.into_iter()
                                 .map(|e| {
-                                    e.with_labels(vec![
-                                        Label::secondary(file_id, reference_location.clone())
-                                            .with_message(format!(
-                                                "While resolving type named `{}`",
-                                                name
-                                            )),
-                                        Label::secondary(file_id, t.location.clone())
-                                            .with_message("Defined as a typedef"),
-                                    ])
+                                    e.with_secondary_label(
+                                        reference_location,
+                                        format!("While resolving type named `{}`", name),
+                                    )
+                                    .with_secondary_label(t.location, "Defined as a typedef")
                                 })
                                 .collect::<Vec<_>>()
                         })?;
@@ -86,8 +139,8 @@ impl NominalType {
         })
     }
 
-    pub fn resolve(&self, file_id: usize, context: &TypecheckContext) -> Result<StructuralType> {
-        self.resolve_with_depth(file_id, context, 16)
+    pub fn resolve(&self, context: &TypecheckContext) -> Result<StructuralType> {
+        self.resolve_with_depth(context, 16)
     }
 }
 
@@ -222,7 +275,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         match self {
             Value::ClientProcessId
             | Value::InHandle(_)
@@ -230,18 +283,12 @@ impl Value {
             | Value::InBuffer(_, _)
             | Value::OutBuffer(_, _) => Ok(()),
             Value::In(t) | Value::Out(t) | Value::InArray(t, _) | Value::OutArray(t, _) => {
-                t.resolve(file_id, context).map(|_| ())
+                t.resolve(context).map(|_| ())
             }
-            Value::InObject(obj, location) => context
-                .resolve_interface(obj, file_id, location)
-                .map(|_| ()),
+            Value::InObject(obj, location) => context.resolve_interface(obj, location).map(|_| ()),
             Value::OutObject(obj, location) => obj
                 .as_ref()
-                .map(|obj| {
-                    context
-                        .resolve_interface(obj, file_id, location)
-                        .map(|_| ())
-                })
+                .map(|obj| context.resolve_interface(obj, location).map(|_| ()))
                 .unwrap_or(Ok(())),
         }
     }
@@ -322,13 +369,13 @@ pub struct StructField {
 }
 
 impl StructField {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
-        match self.ty.resolve(file_id, context) {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
+        match self.ty.resolve(context) {
             Ok(t) => {
                 if !t.is_sized() {
                     return Err(vec![Diagnostic::error()
                         .with_message(format!("Use of unsized type in field `{}`", self.name))
-                        .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+                        .with_primary_label(self.location)]);
                 }
 
                 Ok(())
@@ -337,8 +384,7 @@ impl StructField {
                 return Err(e
                     .into_iter()
                     .map(|e| {
-                        e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                            .with_message(format!("In field `{}`", self.name))])
+                        e.with_secondary_label(self.location, format!("In field `{}`", self.name))
                     })
                     .collect())
             }
@@ -401,7 +447,7 @@ impl Struct {
         })
     }
 
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut fields = BTreeMap::new();
@@ -414,18 +460,14 @@ impl Struct {
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate struct field `{}`", field.name,))
-                        .with_labels(vec![
-                            Label::primary(file_id, field.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previously defined here"),
-                        ]),
+                        .with_primary_label(field.location)
+                        .with_secondary_label(o.get().location, "Previously defined here"),
                 ),
             }
 
-            if let Err(e) = field.typecheck(file_id, context) {
+            if let Err(e) = field.typecheck(context) {
                 diags.extend(e.into_iter().map(|e| {
-                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!("In struct `{}`", self.name))])
+                    e.with_secondary_label(self.location, format!("In struct `{}`", self.name))
                 }))
             }
         }
@@ -448,19 +490,14 @@ pub struct EnumArm {
 }
 
 impl EnumArm {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        _context: &TypecheckContext,
-        base_type: IntType,
-    ) -> Result<()> {
+    pub fn typecheck(&self, _context: &TypecheckContext, base_type: IntType) -> Result<()> {
         if !base_type.fits_u64(self.value) {
             return Err(vec![Diagnostic::error()
                 .with_message(format!(
                     "Value {} of enum arm `{}` does not fit into type {:?}",
                     self.value, self.name, base_type
                 ))
-                .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+                .with_primary_label(self.location)]);
         }
         Ok(())
     }
@@ -477,17 +514,16 @@ pub struct Enum {
 }
 
 impl Enum {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut arm_values: BTreeMap<u64, &EnumArm> = BTreeMap::new();
         let mut arm_names: BTreeMap<&ArcStr, &EnumArm> = BTreeMap::new();
 
         for arm in self.arms.iter() {
-            if let Err(e) = arm.typecheck(file_id, context, self.base_type) {
+            if let Err(e) = arm.typecheck(context, self.base_type) {
                 diags.extend(e.into_iter().map(|e| {
-                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!("In enum `{}`", self.name))])
+                    e.with_secondary_label(self.location, format!("In enum `{}`", self.name))
                 }))
             }
 
@@ -497,12 +533,9 @@ impl Enum {
                 }
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
-                        .with_message(format!("Duplicate enum value",))
-                        .with_labels(vec![
-                            Label::primary(file_id, arm.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previously defined here"),
-                        ]),
+                        .with_message(format!("Duplicate enum value"))
+                        .with_primary_label(arm.location)
+                        .with_secondary_label(o.get().location, "Previously defined here"),
                 ),
             }
 
@@ -513,11 +546,8 @@ impl Enum {
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate enum arm named `{}`", arm.name,))
-                        .with_labels(vec![
-                            Label::primary(file_id, arm.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previously defined here"),
-                        ]),
+                        .with_primary_label(arm.location)
+                        .with_secondary_label(o.get().location, "Previously defined here"),
                 ),
             }
         }
@@ -540,19 +570,14 @@ pub struct BitflagsArm {
 }
 
 impl BitflagsArm {
-    pub fn typecheck(
-        &self,
-        file_id: usize,
-        _context: &TypecheckContext,
-        base_type: IntType,
-    ) -> Result<()> {
+    pub fn typecheck(&self, _context: &TypecheckContext, base_type: IntType) -> Result<()> {
         if !base_type.fits_u64(self.value) {
             return Err(vec![Diagnostic::error()
                 .with_message(format!(
                     "Value {} of bitflags arm `{}` does not fit into type {:?}",
                     self.value, self.name, base_type
                 ))
-                .with_labels(vec![Label::primary(file_id, self.location.clone())])]);
+                .with_labels(vec![self.location.primary_label()])]);
         }
         Ok(())
     }
@@ -569,16 +594,15 @@ pub struct Bitflags {
 }
 
 impl Bitflags {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut arm_names: BTreeMap<&ArcStr, &BitflagsArm> = BTreeMap::new();
 
         for arm in self.arms.iter() {
-            if let Err(e) = arm.typecheck(file_id, context, self.base_type) {
+            if let Err(e) = arm.typecheck(context, self.base_type) {
                 diags.extend(e.into_iter().map(|e| {
-                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!("In bitflags `{}`", self.name))])
+                    e.with_secondary_label(self.location, format!("In bitflags `{}`", self.name))
                 }))
             }
 
@@ -589,11 +613,8 @@ impl Bitflags {
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate bitfield arm named `{}`", arm.name,))
-                        .with_labels(vec![
-                            Label::primary(file_id, arm.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previously defined here"),
-                        ]),
+                        .with_primary_label(arm.location)
+                        .with_secondary_label(o.get().location, "Previously defined here"),
                 ),
             }
         }
@@ -619,14 +640,13 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         for (_, arg) in self.arguments.iter() {
-            if let Err(e) = arg.typecheck(file_id, context) {
+            if let Err(e) = arg.typecheck(context) {
                 diags.extend(e.into_iter().map(|e| {
-                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!("In command `{}`", self.name))])
+                    e.with_secondary_label(self.location, format!("In command `{}`", self.name))
                 }))
             }
         }
@@ -650,17 +670,16 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         let mut diags = Vec::new();
 
         let mut command_names = BTreeMap::new();
         let mut command_ids = BTreeMap::new();
 
         for command in self.commands.iter() {
-            if let Err(e) = command.typecheck(file_id, context) {
+            if let Err(e) = command.typecheck(context) {
                 diags.extend(e.into_iter().map(|e| {
-                    e.with_labels(vec![Label::secondary(file_id, self.location.clone())
-                        .with_message(format!("In interface `{}`", self.name))])
+                    e.with_secondary_label(self.location, format!("In interface `{}`", self.name))
                 }))
             }
 
@@ -671,13 +690,12 @@ impl Interface {
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate command named `{}`", command.name))
-                        .with_labels(vec![
-                            Label::primary(file_id, command.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previous definition here"),
-                            Label::secondary(file_id, self.location.clone())
-                                .with_message(format!("In interface `{}`", self.name)),
-                        ]),
+                        .with_primary_label(command.location)
+                        .with_secondary_label(o.get().location, "Previous definition here")
+                        .with_secondary_label(
+                            self.location,
+                            format!("In interface `{}`", self.name),
+                        ),
                 ),
             }
 
@@ -688,13 +706,12 @@ impl Interface {
                 Entry::Occupied(o) => diags.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate command with id `{}`", command.id))
-                        .with_labels(vec![
-                            Label::primary(file_id, command.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone())
-                                .with_message("Previous definition here"),
-                            Label::secondary(file_id, self.location.clone())
-                                .with_message(format!("In interface `{}`", self.name)),
-                        ]),
+                        .with_primary_label(command.location)
+                        .with_secondary_label(o.get().location, "Previous definition here")
+                        .with_secondary_label(
+                            self.location,
+                            format!("In interface `{}`", self.name),
+                        ),
                 ),
             }
         }
@@ -734,15 +751,15 @@ pub enum TypeWithName {
 }
 
 impl TypeWithName {
-    pub fn typecheck(&self, file_id: usize, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
         match self {
             TypeWithName::TypeAlias(t) => {
-                t.referenced_type.resolve(file_id, context)?;
+                t.referenced_type.resolve(context)?;
                 Ok(())
             }
-            TypeWithName::StructDef(s) => s.typecheck(file_id, context),
-            TypeWithName::EnumDef(e) => e.typecheck(file_id, context),
-            TypeWithName::BitflagsDef(b) => b.typecheck(file_id, context),
+            TypeWithName::StructDef(s) => s.typecheck(context),
+            TypeWithName::EnumDef(e) => e.typecheck(context),
+            TypeWithName::BitflagsDef(b) => b.typecheck(context),
         }
     }
 }
@@ -774,28 +791,19 @@ pub struct TypecheckContext {
 }
 
 impl TypecheckContext {
-    pub fn resolve_type(
-        &self,
-        name: &ArcStr,
-        file_id: usize,
-        reference_location: &Span,
-    ) -> Result<TypeWithName> {
+    pub fn resolve_type(&self, name: &ArcStr, reference_location: &Span) -> Result<TypeWithName> {
         if let Some(t) = self.named_types.get(name) {
             Ok(t.clone())
         } else {
             return Err(vec![Diagnostic::error()
                 .with_message(format!("Could not resolve type named `{}`", name))
-                .with_labels(vec![Label::primary(
-                    file_id,
-                    reference_location.clone(),
-                )])]);
+                .with_primary_label(reference_location)]);
         }
     }
 
     pub fn resolve_interface(
         &self,
         name: &ArcStr,
-        file_id: usize,
         reference_location: &Span,
     ) -> Result<Arc<Interface>> {
         if let Some(t) = self.interfaces.get(name) {
@@ -803,10 +811,7 @@ impl TypecheckContext {
         } else {
             return Err(vec![Diagnostic::error()
                 .with_message(format!("Could not resolve interface named `{}`", name))
-                .with_labels(vec![Label::primary(
-                    file_id,
-                    reference_location.clone(),
-                )])]);
+                .with_primary_label(reference_location)]);
         }
     }
 }
@@ -819,7 +824,7 @@ pub struct IpcFile {
 }
 
 impl IpcFile {
-    pub fn try_new(file_id: usize, items: Vec<IpcFileItem>) -> Result<Self> {
+    pub fn try_new(items: Vec<IpcFileItem>) -> Result<Self> {
         let mut named_types = BTreeMap::new();
         let mut interfaces = BTreeMap::new();
 
@@ -836,12 +841,11 @@ impl IpcFile {
                     diagnostics.borrow_mut().push(
                         Diagnostic::error()
                             .with_message(format!("Multiple definitions of type `{}`", name))
-                            .with_labels(vec![
-                                Label::primary(file_id, ty.location()),
-                                Label::secondary(file_id, occ.get().location()).with_message(
-                                    format!("Previous definition of type `{}`", name),
-                                ),
-                            ]),
+                            .with_primary_label(ty.location())
+                            .with_secondary_label(
+                                occ.get().location(),
+                                format!("Previous definition of type `{}`", name),
+                            ),
                     );
                 }
             }
@@ -858,12 +862,11 @@ impl IpcFile {
                             "Multiple definitions of interface `{}`",
                             interface.name
                         ))
-                        .with_labels(vec![
-                            Label::primary(file_id, interface.location.clone()),
-                            Label::secondary(file_id, o.get().location.clone()).with_message(
-                                format!("Previous definition of interface `{}`", interface.name),
-                            ),
-                        ]),
+                        .with_primary_label(interface.location)
+                        .with_secondary_label(
+                            o.get().location,
+                            format!("Previous definition of interface `{}`", interface.name),
+                        ),
                 ),
             };
 
@@ -893,13 +896,13 @@ impl IpcFile {
         };
 
         for (_, named_type) in context.named_types.iter() {
-            if let Err(e) = named_type.typecheck(file_id, &context) {
+            if let Err(e) = named_type.typecheck(&context) {
                 diagnostics.extend(e);
             }
         }
 
         for (_, interface) in context.interfaces.iter() {
-            if let Err(e) = interface.typecheck(file_id, &context) {
+            if let Err(e) = interface.typecheck(&context) {
                 diagnostics.extend(e);
             }
         }
