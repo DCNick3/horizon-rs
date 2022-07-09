@@ -15,6 +15,7 @@ use lalrpop_util::lalrpop_mod;
 
 pub mod diagnostics;
 pub mod model;
+mod typecheck;
 
 lalrpop_mod!(parser, "/swipc/swipc.rs");
 
