@@ -6,7 +6,7 @@ use crate::swipc::{
 };
 use genco::prelude::*;
 
-fn make_int_type(t: IntType) -> Tokens {
+pub fn make_int_type(t: IntType) -> Tokens {
     match t {
         IntType::U8 => quote!(u8),
         IntType::U16 => quote!(u16),
@@ -19,7 +19,7 @@ fn make_int_type(t: IntType) -> Tokens {
     }
 }
 
-fn make_nominal_type(current_namespace: &Namespace, t: &NominalType) -> Tokens {
+pub fn make_nominal_type(current_namespace: &Namespace, t: &NominalType) -> Tokens {
     match t {
         &NominalType::Int(t) => make_int_type(t),
         NominalType::Bool => quote!(bool),
@@ -37,7 +37,7 @@ fn make_nominal_type(current_namespace: &Namespace, t: &NominalType) -> Tokens {
     }
 }
 
-fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
+pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
     let name = make_ident(s.name.ident());
     let name = &name;
     let namespace = s.name.namespace();
@@ -70,7 +70,7 @@ fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
     );
 }
 
-fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
+pub fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     let name = make_ident(e.name.ident());
     let namespace = e.name.namespace();
 
@@ -89,7 +89,7 @@ fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     );
 }
 
-fn gen_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
+pub fn gen_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
     let name = make_ident(b.name.ident());
     let namespace = b.name.namespace();
 
@@ -115,7 +115,7 @@ fn gen_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
     );
 }
 
-fn gen_type_alias(tok: &mut TokenStorage, _ctx: &CodegenContext, a: &TypeAlias) {
+pub fn gen_type_alias(tok: &mut TokenStorage, _ctx: &CodegenContext, a: &TypeAlias) {
     let name = make_ident(a.name.ident());
     let namespace = a.name.namespace();
 
@@ -149,7 +149,7 @@ mod tests {
 
         println!("{}", file.join("\n"));
 
-        assert_eq!(file, vec!["use super::d::::B;", "", "B"])
+        assert_eq!(file, vec!["use super::d::B;", "", "B"])
     }
 
     #[test]

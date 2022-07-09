@@ -1,4 +1,6 @@
-use crate::swipc::model::{Namespace, NamespacedIdent};
+use crate::swipc::codegen::types::{gen_bitflags, gen_enum, gen_struct, gen_type_alias};
+use crate::swipc::model::{CodegenContext, IpcFile, IpcFileItem, Namespace, NamespacedIdent};
+use anyhow::Context;
 use arcstr::ArcStr;
 use genco::fmt::Indentation;
 use genco::lang::rust::Tokens;
@@ -60,6 +62,10 @@ fn import_in(current_namespace: &Namespace, import_item: &NamespacedIdent) -> To
 
         quote!($id)
     } else {
+        // remove the last "::"
+        relative_mod_name.remove(relative_mod_name.len() - 1);
+        relative_mod_name.remove(relative_mod_name.len() - 1);
+
         let imp = rust::import(relative_mod_name, import_item.ident().as_str());
 
         quote!($imp)
@@ -79,7 +85,7 @@ fn filename_for_namespace(namespace: &Namespace) -> String {
     r
 }
 
-struct TokenStorage {
+pub struct TokenStorage {
     storage: BTreeMap<Arc<Vec<ArcStr>>, Tokens>,
 }
 
@@ -112,7 +118,9 @@ impl TokenStorage {
                 let contents = w.into_inner();
 
                 let formatter = make_formatter();
-                let contents = formatter.format_str(contents)?;
+                let contents = formatter
+                    .format_str(contents)
+                    .with_context(|| format!("Formatting {}", name))?;
 
                 Ok((name, contents))
             })
@@ -124,4 +132,103 @@ fn make_formatter() -> impl rust_format::Formatter {
     let config = rust_format::Config::new_str().post_proc(PostProcess::ReplaceMarkersAndDocBlocks);
 
     rust_format::PrettyPlease::from_config(config)
+}
+
+fn gen_ipc_file(tok: &mut TokenStorage, ctx: &CodegenContext, f: &IpcFile) {
+    for item in f.iter_items() {
+        match item {
+            IpcFileItem::TypeAlias(a) => gen_type_alias(tok, ctx, a),
+            IpcFileItem::StructDef(s) => gen_struct(tok, ctx, s),
+            IpcFileItem::EnumDef(e) => gen_enum(tok, ctx, e),
+            IpcFileItem::BitflagsDef(b) => gen_bitflags(tok, ctx, b),
+            IpcFileItem::InterfaceDef(_) => {
+                todo!("Interface codegen")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::swipc::codegen::{gen_ipc_file, TokenStorage};
+    use crate::swipc::model::IpcFile;
+    use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
+    use indoc::indoc;
+    use itertools::Itertools;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn multifile() {
+        let s = r#"
+            struct ns1::Struct1 {
+                ns2::Enum1 test;
+            };
+            enum ns2::Enum1 : u32 {
+                Arm1 = 1,
+                Arm2 = 2,
+            };
+            type ns3::HelloAlias = ns1::Struct1;
+            type ns3::nested::HelloAlias2 = ns3::HelloAlias;
+        "#;
+
+        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+
+        let mut ts = TokenStorage::new();
+
+        gen_ipc_file(&mut ts, file.context(), &file);
+
+        let files = ts.to_file_string().unwrap();
+
+        for (name, file) in files.iter() {
+            println!("--- {} ---", name);
+            println!("{}\n\n", file);
+        }
+
+        let expected_files = [
+            (
+                "ns1/mod.rs",
+                indoc! {"
+                    use super::ns2::Enum1;
+                    #[repr(C)]
+                    pub struct Struct1 {
+                        test: Enum1,
+                    }
+                    // Static size check for Struct1 (expect 4 bytes)
+                    const _: fn() = || {
+                        let _ = ::core::mem::transmute::<Struct1, [u8; 4]>;
+                    };
+
+                "},
+            ),
+            (
+                "ns2/mod.rs",
+                indoc! {"
+                    #[repr(u32)]
+                    pub enum Enum1 {
+                        Arm1 = 1,
+                        Arm2 = 2,
+                    }
+                "},
+            ),
+            (
+                "ns3/mod.rs",
+                indoc! {"
+                    use super::ns1::Struct1;
+                    type HelloAlias = Struct1;
+                "},
+            ),
+            (
+                "ns3/nested/mod.rs",
+                indoc! {"
+                    use super::HelloAlias;
+                    type HelloAlias2 = HelloAlias;
+                "},
+            ),
+        ]
+        .into_iter()
+        .map(|(n, c)| (n.to_string(), c.to_string()))
+        .collect();
+
+        assert_eq!(files, expected_files);
+    }
 }
