@@ -12,17 +12,37 @@ use std::collections::BTreeMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
+pub type Namespace = Arc<Vec<ArcStr>>;
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct NamespacedIdent {
-    ident: Arc<Vec<ArcStr>>,
+    namespace: Namespace,
+    ident: ArcStr,
 }
 
 static IDENT_PART_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z_]\w*$").unwrap());
 
 impl NamespacedIdent {
-    pub fn new(value: Arc<Vec<ArcStr>>) -> Self {
-        assert!(!value.is_empty());
-        Self { ident: value }
+    pub fn new(namespace: Arc<Vec<ArcStr>>, ident: ArcStr) -> Self {
+        Self { namespace, ident }
+    }
+
+    pub fn from_parts(parts: Vec<ArcStr>) -> Self {
+        assert!(!parts.is_empty());
+
+        let mut it = parts.into_iter().peekable();
+
+        let mut namespace = Vec::new();
+
+        loop {
+            let part = it.next().unwrap();
+
+            if it.peek().is_some() {
+                namespace.push(part);
+            } else {
+                return Self::new(Arc::new(namespace), part);
+            }
+        }
     }
 
     pub fn parse(s: &str) -> anyhow::Result<Self> {
@@ -40,26 +60,28 @@ impl NamespacedIdent {
             return Err(anyhow::anyhow!("Empty identifiers are not allowed"));
         }
 
-        Ok(Self::new(Arc::new(res)))
+        Ok(Self::from_parts(res))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &ArcStr> {
-        self.ident.iter()
+    pub fn iter_namespaces(&self) -> impl Iterator<Item = &ArcStr> {
+        self.namespace.iter()
     }
 
-    pub fn ref_inner(&self) -> &Vec<ArcStr> {
+    pub fn namespace(&self) -> &Namespace {
+        &self.namespace
+    }
+
+    pub fn ident(&self) -> &ArcStr {
         &self.ident
     }
 }
 
 impl Debug for NamespacedIdent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut iter = self.ident.iter();
-        write!(f, "{}", iter.next().unwrap())?;
-        for part in iter {
-            write!(f, "::{}", part)?;
+        for namespace in self.iter_namespaces() {
+            write!(f, "{}::", namespace)?;
         }
-
+        write!(f, "{}", self.ident())?;
         Ok(())
     }
 }

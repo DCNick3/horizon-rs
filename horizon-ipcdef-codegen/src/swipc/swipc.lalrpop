@@ -32,9 +32,8 @@ Comma<T>: Vec<T> = {
     }
 };
 
-NamespacedIdent: NamespacedIdent = <mut v:(<LocalIdent> "::")*> <l:LocalIdent> => {
-    v.push(l);
-    NamespacedIdent::new(Arc::new(v))
+NamespacedIdent: NamespacedIdent = <namespace:(<LocalIdent> "::")*> <id:LocalIdent> => {
+    NamespacedIdent::new(Arc::new(namespace), id)
 };
 
 LocalIdent: ArcStr = <s:r"[a-zA-Z_]\w*"> => ArcStr::from(s);
