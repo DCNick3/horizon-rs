@@ -56,7 +56,7 @@ impl StructField {
                 Ok(())
             }
             Err(e) => {
-                return Err(e.with_context(self.location, || format!("In field `{}`", self.name)))
+                Err(e.with_context(self.location, || format!("In field `{}`", self.name)))
             }
         }
     }
@@ -129,7 +129,7 @@ impl Enum {
                 }
                 Entry::Occupied(o) => res.push(
                     Diagnostic::error()
-                        .with_message(format!("Duplicate enum value"))
+                        .with_message("Duplicate enum value".to_string())
                         .with_primary_label(arm.location)
                         .with_secondary_label(o.get().location, "Previously defined here"),
                 ),

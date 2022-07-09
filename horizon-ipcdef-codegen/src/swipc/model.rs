@@ -56,17 +56,17 @@ impl NominalType {
                             .with_primary_label(t.location)]);
                     }
 
-                    let ty = t
+                    
+                    t
                         .referenced_type
                         .resolve_with_depth(context, depth_limit - 1)
                         .with_context(reference_location, || {
                             format!("While resolving type named `{}`", name)
-                        })?;
-                    ty
+                        })?
                 }
-                TypeWithName::StructDef(s) => StructuralType::Struct(s.clone()),
-                TypeWithName::EnumDef(e) => StructuralType::Enum(e.clone()),
-                TypeWithName::BitflagsDef(b) => StructuralType::Bitflags(b.clone()),
+                TypeWithName::StructDef(s) => StructuralType::Struct(s),
+                TypeWithName::EnumDef(e) => StructuralType::Enum(e),
+                TypeWithName::BitflagsDef(b) => StructuralType::Bitflags(b),
             },
         })
     }
@@ -300,8 +300,7 @@ impl Struct {
     ) -> diagnostics::Result<Self> {
         let is_large_data = markers
             .iter()
-            .find(|&v| v == &StructMarker::LargeData)
-            .is_some();
+            .any(|v| v == &StructMarker::LargeData);
         let preferred_transfer_mode = markers
             .iter()
             .filter_map(|v| match v {
@@ -434,10 +433,10 @@ impl TypeWithName {
 
     pub fn location(&self) -> Span {
         match self {
-            TypeWithName::TypeAlias(a) => a.location.clone(),
-            TypeWithName::StructDef(s) => s.location.clone(),
-            TypeWithName::EnumDef(e) => e.location.clone(),
-            TypeWithName::BitflagsDef(b) => b.location.clone(),
+            TypeWithName::TypeAlias(a) => a.location,
+            TypeWithName::StructDef(s) => s.location,
+            TypeWithName::EnumDef(e) => e.location,
+            TypeWithName::BitflagsDef(b) => b.location,
         }
     }
 }
