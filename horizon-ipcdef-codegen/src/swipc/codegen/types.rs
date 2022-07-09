@@ -1,5 +1,5 @@
 use crate::swipc::codegen::{import_in, make_ident};
-use crate::swipc::model::{Bitflags, Enum, IntType, Namespace};
+use crate::swipc::model::{Bitflags, Enum, IntType, Namespace, TypeAlias};
 use crate::swipc::{
     codegen::{TokenStorage, Tokens},
     model::{CodegenContext, NominalType, Struct},
@@ -89,7 +89,7 @@ fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     );
 }
 
-fn get_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
+fn gen_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
     let name = make_ident(b.name.ident());
     let namespace = b.name.namespace();
 
@@ -115,9 +115,23 @@ fn get_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
     );
 }
 
+fn gen_type_alias(tok: &mut TokenStorage, _ctx: &CodegenContext, a: &TypeAlias) {
+    let name = make_ident(a.name.ident());
+    let namespace = a.name.namespace();
+
+    let ty = make_nominal_type(namespace, &a.referenced_type);
+
+    tok.push(
+        namespace.clone(),
+        quote! {
+            type $name = $ty;
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::swipc::codegen::types::{gen_enum, gen_struct, get_bitflags};
+    use crate::swipc::codegen::types::{gen_bitflags, gen_enum, gen_struct, gen_type_alias};
     use crate::swipc::codegen::{import_in, TokenStorage};
     use crate::swipc::model::{IpcFile, IpcFileItem, NamespacedIdent};
     use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
@@ -225,14 +239,14 @@ mod tests {
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
-        let s = match item {
+        let e = match item {
             IpcFileItem::EnumDef(s) => s,
             _ => unreachable!(),
         };
 
         let mut ts = TokenStorage::new();
 
-        gen_enum(&mut ts, file.context(), s);
+        gen_enum(&mut ts, file.context(), e);
 
         let (_, res) = ts
             .to_file_string()
@@ -270,14 +284,14 @@ mod tests {
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
-        let s = match item {
+        let b = match item {
             IpcFileItem::BitflagsDef(s) => s,
             _ => unreachable!(),
         };
 
         let mut ts = TokenStorage::new();
 
-        get_bitflags(&mut ts, file.context(), s);
+        gen_bitflags(&mut ts, file.context(), b);
 
         let (_, res) = ts
             .to_file_string()
@@ -295,6 +309,42 @@ mod tests {
                 bitflags! {
                     pub struct HelloEnum : u8 { const Arm1 = 0x1; const Arm2 = 0x2; const Arm12 = 0x3; }
                 }
+            "}
+        )
+    }
+
+    #[test]
+    fn simple_alias() {
+        let s = r#"
+            type HelloAlias = sf::Bytes<0x1000>;
+        "#;
+
+        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+
+        let item = file.iter_items().next().unwrap();
+        // TODO: add an into_struct method or smth
+        let a = match item {
+            IpcFileItem::TypeAlias(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut ts = TokenStorage::new();
+
+        gen_type_alias(&mut ts, file.context(), a);
+
+        let (_, res) = ts
+            .to_file_string()
+            .unwrap()
+            .into_iter()
+            .exactly_one()
+            .unwrap();
+
+        println!("{}", res);
+
+        assert_eq!(
+            res,
+            indoc! {"
+                type HelloAlias = [u8; 4096];
             "}
         )
     }
