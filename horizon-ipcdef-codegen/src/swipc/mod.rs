@@ -9,6 +9,7 @@
 //! - do not put the placeholder u64 when sending our own PID using the kernel, it will be done automagically (see [here](https://discord.com/channels/269333940928512010/383368936466546698/994962645906108426))
 //! - remote nn:: namespace prefix (we are not nintendo)
 //! - use atmosphere's sf::Out markers for outputs, removing the `->` part altogether
+//! - service names should be "in quotes"
 //! - ???
 
 use lalrpop_util::lalrpop_mod;
@@ -30,8 +31,8 @@ lalrpop_mod!(
 mod tests {
     use crate::swipc::diagnostics::{diagnostic_error_from_parse_error, Span};
     use crate::swipc::model::{
-        BufferTransferMode, IntType, Interface, IpcFile, NominalType, Struct, StructField,
-        TypeAlias,
+        BufferTransferMode, IntType, Interface, IpcFile, NamespacedIdent, NominalType, Struct,
+        StructField, TypeAlias,
     };
     use crate::swipc::parser;
     use codespan_reporting::diagnostic::Diagnostic;
@@ -92,18 +93,18 @@ mod tests {
     #[test]
     fn simple_type_alias() {
         let t: TypeAlias = unwrap_parse("type hello::world = u8;", parse_type_alias);
-        assert_eq!(t.name, "hello::world");
+        assert_eq!(t.name, NamespacedIdent::parse("hello::world").unwrap());
         assert_eq!(t.referenced_type, NominalType::Int(IntType::U8));
     }
 
     #[test]
     fn name_type_alias() {
         let t: TypeAlias = unwrap_parse(r"type some_struct = some_other_struct;", parse_type_alias);
-        assert_eq!(t.name, "some_struct");
+        assert_eq!(t.name, NamespacedIdent::parse("some_struct").unwrap());
         assert_eq!(
             t.referenced_type,
             NominalType::TypeName {
-                name: arcstr::literal!("some_other_struct"),
+                name: NamespacedIdent::parse("some_other_struct").unwrap(),
                 reference_location: Span::default(),
             },
         );
@@ -126,7 +127,7 @@ mod tests {
         assert_eq!(
             t,
             Struct {
-                name: arcstr::literal!("some_struct"),
+                name: NamespacedIdent::parse("some_struct").unwrap(),
                 is_large_data: false,
                 preferred_transfer_mode: None,
                 fields: vec![
@@ -162,7 +163,7 @@ mod tests {
         assert_eq!(
             t,
             Struct {
-                name: arcstr::literal!("some_struct"),
+                name: NamespacedIdent::parse("some_struct").unwrap(),
                 is_large_data: true,
                 preferred_transfer_mode: Some(BufferTransferMode::Pointer),
                 fields: vec![
@@ -214,7 +215,7 @@ interface fssrv::sf::IDirectory {
     #[test]
     fn iuserinterface_interface() {
         let s = r#"
-interface sm::detail::IUserInterface is sm: {
+interface sm::detail::IUserInterface is "sm:" {
 	/// Needs to be called before any other command may be used. On version 3.0.0
 	/// and lower, if this function is not called, `GetService`, `RegisterService`
 	/// and `UnregisterService` may be called without restriction, thanks to
@@ -238,6 +239,12 @@ interface sm::detail::IUserInterface is sm: {
         let interface: Interface = unwrap_parse(s, parse_interface);
 
         println!("{:#?}", interface);
+
+        assert_eq!(
+            interface.name,
+            NamespacedIdent::parse("sm::detail::IUserInterface").unwrap()
+        );
+        assert_eq!(interface.sm_names, vec!["sm:"]);
     }
 
     pub fn parse_ipc_file(s: &str) -> Result<IpcFile, ParseError> {

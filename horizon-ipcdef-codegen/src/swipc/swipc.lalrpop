@@ -7,7 +7,7 @@ use crate::swipc::model::{
     NominalType, IntType, Struct, Enum, Bitflags, Interface,
     Command, Value, HandleTransferType, BufferTransferMode,
     StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias,
-    IpcFile, StructField, EnumArm, BitflagsArm,
+    IpcFile, StructField, EnumArm, BitflagsArm, NamespacedIdent,
 };
 use crate::swipc::diagnostics::Span;
 
@@ -32,13 +32,19 @@ Comma<T>: Vec<T> = {
     }
 };
 
-Ident: ArcStr = <s:r"[a-zA-Z_][a-zA-Z\d_\-:]*"> => ArcStr::from(s);
-
-LocalIdent: ArcStr = <s:Ident> => {
-    assert!(!s.contains(':'), "Local identifier can't have ':' in it");
-    assert!(!s.contains('-'), "Local identifier can't have '-' in it");
-    ArcStr::from(s)
+NamespacedIdent: NamespacedIdent = <mut v:(<LocalIdent> "::")*> <l:LocalIdent> => {
+    v.push(l);
+    NamespacedIdent::new(Arc::new(v))
 };
+
+LocalIdent: ArcStr = <s:r"[a-zA-Z_]\w*"> => ArcStr::from(s);
+
+// Note: this allows stuff like "hello : lol" due to us not having a custom lexer
+// I think it's okay for now, but maybe we would want to do something about it =)
+ServiceName: ArcStr = <s:r#""([\d\w:]*)""#> => {
+    ArcStr::from(&s[1..s.len()-1])
+};
+
 
 IntType: IntType = {
     "u8" => IntType::U8,
@@ -78,7 +84,7 @@ StructField: StructField =
 pub StructDef: Struct =
     <l:@L>
     Docs
-    "struct" <name:Ident> <markers:(":" <Comma<StructMarker>>)?> "{"
+    "struct" <name:NamespacedIdent> <markers:(":" <Comma<StructMarker>>)?> "{"
         <fields:(<StructField>)*>
         // Allow docs here because.... Reasons (need for test readability, lol)
         Docs
@@ -108,7 +114,7 @@ EnumArm: EnumArm =
 pub EnumDef: Enum =
     <l:@L>
     Docs
-    "enum" <name:Ident> ":" <base_type:IntType> "{"
+    "enum" <name:NamespacedIdent> ":" <base_type:IntType> "{"
         <arms:Comma<EnumArm>>
     "}" ";"
     <r:@R> => Enum {
@@ -131,7 +137,7 @@ BitflagsArm: BitflagsArm =
 pub BitflagsDef: Bitflags =
     <l:@L>
     Docs
-    "bitflags" <name:Ident> ":" <base_type:IntType> "{"
+    "bitflags" <name:NamespacedIdent> ":" <base_type:IntType> "{"
         <arms:Comma<BitflagsArm>>
     "}" ";"
     <r:@R> => Bitflags {
@@ -152,7 +158,7 @@ NominalType: NominalType = {
     "sf::Bytes" "<" <size:Num> ">" => NominalType::Bytes { size, alignment: 1 },
     "sf::Bytes" "<" <size:Num> "," <alignment:Num> ">" => NominalType::Bytes { size, alignment },
     "sf::Unknown" <size:("<" <Num> ">")?> => NominalType::Unknown { size },
-    <l:@L> <i:Ident> <r:@R> => NominalType::TypeName {
+    <l:@L> <i:NamespacedIdent> <r:@R> => NominalType::TypeName {
         name: i,
         reference_location: Span::new(file_id, l, r),
     },
@@ -160,7 +166,7 @@ NominalType: NominalType = {
 
 pub TypeAlias: TypeAlias =
     <l:@L>
-    "type" <name:Ident> "=" <ty:NominalType> ";"
+    "type" <name:NamespacedIdent> "=" <ty:NominalType> ";"
     <r:@R> => TypeAlias {
         name,
         referenced_type: ty,
@@ -185,7 +191,7 @@ Value: Value = {
     "sf::InNonSecureAutoSelectBuffer" => Value::InBuffer(BufferTransferMode::AutoSelect, BufferExtraAttrs::AllowNonSecure),
 
     "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> "sf::IUnknown" <r:@R> ">" ">" => Value::OutObject(None, Span::new(file_id, l, r)),
-    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" ">" => Value::OutObject(Some(iface), Span::new(file_id, l, r)),
+    "sf::Out" "<" "sf::SharedPointer" "<" <l:@L> <iface:NamespacedIdent> <r:@R> ">" ">" => Value::OutObject(Some(iface), Span::new(file_id, l, r)),
     "sf::Out" "<" <t:NominalType> ">" => Value::Out(t),
 
     "sf::OutBuffer" => Value::OutBuffer(BufferTransferMode::MapAlias, BufferExtraAttrs::None),
@@ -207,7 +213,7 @@ Value: Value = {
     "sf::OutPointerArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::Pointer)),
     "sf::OutAutoSelectArray" "<" <t:NominalType> ">" => Value::OutArray(t, Some(BufferTransferMode::AutoSelect)),
 
-    "sf::SharedPointer" "<" <l:@L> <iface:Ident> <r:@R> ">" => Value::InObject(iface, Span::new(file_id, l, r)),
+    "sf::SharedPointer" "<" <l:@L> <iface:NamespacedIdent> <r:@R> ">" => Value::InObject(iface, Span::new(file_id, l, r)),
     <t:NominalType> => Value::In(t),
 };
 
@@ -252,7 +258,7 @@ Command: Command =
 
 pub InterfaceDef: Interface =
     <l:@L>
-    "interface" <name:Ident> <sm_names:("is" <Comma<Ident>>)?> "{"
+    "interface" <name:NamespacedIdent> <sm_names:("is" <Comma<ServiceName>>)?> "{"
         <commands:(<Command> ";")*>
     "}"
     <r:@R> => Interface {

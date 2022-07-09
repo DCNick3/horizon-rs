@@ -4,10 +4,71 @@ use arcstr::ArcStr;
 use codespan_reporting::diagnostic::Diagnostic;
 use derivative::Derivative;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::cell::RefCell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct NamespacedIdent {
+    ident: Arc<Vec<ArcStr>>,
+}
+
+static IDENT_PART_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z_]\w*$").unwrap());
+
+impl NamespacedIdent {
+    pub fn new(value: Arc<Vec<ArcStr>>) -> Self {
+        assert!(!value.is_empty());
+        Self { ident: value }
+    }
+
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        let mut res = Vec::new();
+
+        for part in s.split("::") {
+            if !IDENT_PART_REGEX.is_match(part) {
+                return Err(anyhow::anyhow!("Some part of the identifier contained symbols that are not allowed or started with a number"));
+            }
+
+            res.push(ArcStr::from(part));
+        }
+
+        if res.is_empty() {
+            return Err(anyhow::anyhow!("Empty identifiers are not allowed"));
+        }
+
+        Ok(Self::new(Arc::new(res)))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ArcStr> {
+        self.ident.iter()
+    }
+
+    pub fn ref_inner(&self) -> &Vec<ArcStr> {
+        &self.ident
+    }
+}
+
+impl Debug for NamespacedIdent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.ident.iter();
+        write!(f, "{}", iter.next().unwrap())?;
+        for part in iter {
+            write!(f, "::{}", part)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for NamespacedIdent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 /// Types are those things that have a known byte representations
 /// Usually they will be sent as-is via the wire (put into the payload), but sometimes (structs with sf::LargeData marker) they would be sent as buffers instead
@@ -27,7 +88,7 @@ pub enum NominalType {
         size: Option<u64>,
     },
     TypeName {
-        name: ArcStr,
+        name: NamespacedIdent,
         #[derivative(PartialEq = "ignore")]
         reference_location: Span,
     },
@@ -176,9 +237,9 @@ pub enum Value {
     Out(NominalType),
 
     /// sf::SharedPointer<T>
-    InObject(ArcStr, Span),
+    InObject(NamespacedIdent, Span),
     /// sf::Out<sf::SharedPointer<T>>
-    OutObject(Option<ArcStr>, Span),
+    OutObject(Option<NamespacedIdent>, Span),
 
     /// sf::CopyHandle
     /// sf::MoveHandle
@@ -293,7 +354,7 @@ pub struct StructField {
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
 pub struct Struct {
-    pub name: ArcStr,
+    pub name: NamespacedIdent,
     pub is_large_data: bool,
     pub preferred_transfer_mode: Option<BufferTransferMode>,
     pub fields: Vec<StructField>,
@@ -303,7 +364,7 @@ pub struct Struct {
 
 impl Struct {
     pub fn try_new(
-        name: ArcStr,
+        name: NamespacedIdent,
         fields: Vec<StructField>,
         markers: Vec<StructMarker>,
         location: Span,
@@ -355,7 +416,7 @@ pub struct EnumArm {
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
 pub struct Enum {
-    pub name: ArcStr,
+    pub name: NamespacedIdent,
     pub base_type: IntType,
     pub arms: Vec<EnumArm>,
     #[derivative(PartialEq = "ignore")]
@@ -374,7 +435,7 @@ pub struct BitflagsArm {
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
 pub struct Bitflags {
-    pub name: ArcStr,
+    pub name: NamespacedIdent,
     pub base_type: IntType,
     pub arms: Vec<BitflagsArm>,
     #[derivative(PartialEq = "ignore")]
@@ -396,7 +457,7 @@ pub struct Command {
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
 pub struct Interface {
-    pub name: ArcStr,
+    pub name: NamespacedIdent,
     pub sm_names: Vec<ArcStr>,
     pub commands: Vec<Command>,
     #[derivative(PartialEq = "ignore")]
@@ -406,7 +467,7 @@ pub struct Interface {
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq)]
 pub struct TypeAlias {
-    pub name: ArcStr,
+    pub name: NamespacedIdent,
     pub referenced_type: NominalType,
     #[derivative(PartialEq = "ignore")]
     pub location: Span,
@@ -430,7 +491,7 @@ pub enum TypeWithName {
 }
 
 impl TypeWithName {
-    pub fn name(&self) -> &ArcStr {
+    pub fn name(&self) -> &NamespacedIdent {
         match self {
             TypeWithName::TypeAlias(a) => &a.name,
             TypeWithName::StructDef(s) => &s.name,
@@ -451,14 +512,14 @@ impl TypeWithName {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypecheckContext {
-    pub named_types: BTreeMap<ArcStr, TypeWithName>,
-    pub interfaces: BTreeMap<ArcStr, Arc<Interface>>,
+    pub named_types: BTreeMap<NamespacedIdent, TypeWithName>,
+    pub interfaces: BTreeMap<NamespacedIdent, Arc<Interface>>,
 }
 
 impl TypecheckContext {
     pub fn resolve_type(
         &self,
-        name: &ArcStr,
+        name: &NamespacedIdent,
         reference_location: &Span,
     ) -> diagnostics::Result<TypeWithName> {
         if let Some(t) = self.named_types.get(name) {
@@ -472,7 +533,7 @@ impl TypecheckContext {
 
     pub fn resolve_interface(
         &self,
-        name: &ArcStr,
+        name: &NamespacedIdent,
         reference_location: &Span,
     ) -> diagnostics::Result<Arc<Interface>> {
         if let Some(t) = self.interfaces.get(name) {
@@ -487,8 +548,8 @@ impl TypecheckContext {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct CodegenContext {
-    resolved_type_names: BTreeMap<ArcStr, StructuralType>,
-    resolved_interfaces: BTreeMap<ArcStr, Arc<Interface>>,
+    resolved_type_names: BTreeMap<NamespacedIdent, StructuralType>,
+    resolved_interfaces: BTreeMap<NamespacedIdent, Arc<Interface>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

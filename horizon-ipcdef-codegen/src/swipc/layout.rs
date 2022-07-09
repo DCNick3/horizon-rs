@@ -72,6 +72,7 @@ pub struct StructLayout {
 }
 
 impl Struct {
+    #[allow(unused_assignments)]
     pub fn fields_layout(&self, context: &CodegenContext) -> StructLayout {
         let mut position = 0;
 
@@ -85,7 +86,7 @@ impl Struct {
                 FieldsLayoutItem::Padding(size) => {
                     position += size;
                 }
-                FieldsLayoutItem::Field(size, index) => {
+                FieldsLayoutItem::Field(size, _) => {
                     field_offsets.push(position);
                     position += size;
                 }
