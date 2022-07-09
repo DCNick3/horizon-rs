@@ -6,7 +6,9 @@ use genco::fmt::Indentation;
 use genco::lang::rust::Tokens;
 use genco::lang::{rust, Rust};
 use genco::quote;
+use itertools::Itertools;
 use rust_format::{Formatter, PostProcess};
+use sequence_trie::SequenceTrie;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -100,12 +102,50 @@ impl TokenStorage {
         self.storage.entry(namespace).or_default().append(tokens);
     }
 
-    pub fn to_file_string(self) -> anyhow::Result<BTreeMap<String, String>> {
-        // TODO: add "mod" directives for all the submodules
+    pub fn to_file_string(mut self) -> anyhow::Result<BTreeMap<String, String>> {
+        let namespaces_trie = {
+            let mut builder = SequenceTrie::new();
+
+            for namespace in self.storage.keys() {
+                for i in 0..=namespace.len() {
+                    // we want to push all base namespaces!
+                    builder.insert(&namespace.as_slice()[..i], ());
+                }
+            }
+
+            builder
+        };
+
+        // synthesise all intermediate modules to put "mod" directives in them
+        for (namespace, ()) in namespaces_trie.iter() {
+            let namespace = namespace.into_iter().map(|v| v.clone()).collect::<Vec<_>>();
+            self.storage.entry(Arc::new(namespace)).or_default();
+        }
 
         self.storage
             .into_iter()
             .map(|(ns, tok)| {
+                let node = if ns.is_empty() {
+                    &namespaces_trie
+                } else {
+                    namespaces_trie.get_node(ns.iter()).unwrap()
+                };
+
+                let child_modules = node
+                    .children_with_keys()
+                    .into_iter()
+                    .map(|(name, _)| name.clone())
+                    .sorted()
+                    .collect::<Vec<_>>();
+
+                let tok = quote! {
+                    $(for module in child_modules {
+                        mod $(module.as_str());
+                    })
+
+                    $tok
+                };
+
                 let name = filename_for_namespace(&ns);
 
                 let mut w = genco::fmt::FmtWriter::new(String::new());
@@ -154,8 +194,6 @@ mod tests {
     use crate::swipc::model::IpcFile;
     use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
     use indoc::indoc;
-    use itertools::Itertools;
-    use std::collections::BTreeMap;
 
     #[test]
     fn multifile() {
@@ -186,6 +224,14 @@ mod tests {
 
         let expected_files = [
             (
+                "mod.rs",
+                indoc! {"
+                    mod ns1;
+                    mod ns2;
+                    mod ns3;
+                "},
+            ),
+            (
                 "ns1/mod.rs",
                 indoc! {"
                     use super::ns2::Enum1;
@@ -214,6 +260,7 @@ mod tests {
                 "ns3/mod.rs",
                 indoc! {"
                     use super::ns1::Struct1;
+                    mod nested;
                     type HelloAlias = Struct1;
                 "},
             ),

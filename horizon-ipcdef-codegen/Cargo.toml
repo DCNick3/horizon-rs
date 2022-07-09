@@ -25,6 +25,7 @@ itertools = "0.10.3"
 genco = "0.17.0"
 rust-format = { version = "0.3.4", features = ["pretty_please", "post_process"] }
 indoc = "1.0.6"
+sequence_trie = "0.3.6"
 
 [build-dependencies]
 lalrpop = "0.19.8"
