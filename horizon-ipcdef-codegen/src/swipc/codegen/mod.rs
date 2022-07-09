@@ -95,7 +95,7 @@ impl TokenStorage {
     }
 
     pub fn to_file_string(self) -> anyhow::Result<BTreeMap<String, String>> {
-        // TODO: add "mod" directives
+        // TODO: add "mod" directives for all the submodules
 
         self.storage
             .into_iter()

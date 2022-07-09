@@ -1,7 +1,6 @@
-use crate::swipc::codegen::import_in;
-use crate::swipc::model::{IntType, Namespace};
+use crate::swipc::codegen::{import_in, make_ident};
+use crate::swipc::model::{Bitflags, Enum, IntType, Namespace};
 use crate::swipc::{
-    codegen,
     codegen::{TokenStorage, Tokens},
     model::{CodegenContext, NominalType, Struct},
 };
@@ -39,7 +38,7 @@ fn make_nominal_type(current_namespace: &Namespace, t: &NominalType) -> Tokens {
 }
 
 fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
-    let name = codegen::make_ident(s.name.ident());
+    let name = make_ident(s.name.ident());
     let name = &name;
     let namespace = s.name.namespace();
 
@@ -58,8 +57,8 @@ fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
             $(if s.is_large_data { #[doc = " This struct is marked with sf::LargeData"] })
             #[repr(C)]
             pub struct $name {
-                $(for f in s.fields.iter() join (,) {
-                    $(f.name.as_str()): $(make_nominal_type(namespace, &f.ty))
+                $(for f in s.fields.iter() {
+                    $(make_ident(&f.name)): $(make_nominal_type(namespace, &f.ty)),
                 })
             }
 
@@ -71,9 +70,54 @@ fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
     );
 }
 
+fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
+    let name = make_ident(e.name.ident());
+    let namespace = e.name.namespace();
+
+    let base_type = make_int_type(e.base_type);
+
+    tok.push(
+        namespace.clone(),
+        quote! {
+            #[repr($base_type)]
+            pub enum $name {
+                $(for arm in e.arms.iter() {
+                    $(make_ident(&arm.name)) = $(arm.value),
+                })
+            }
+        },
+    );
+}
+
+fn get_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags) {
+    let name = make_ident(b.name.ident());
+    let namespace = b.name.namespace();
+
+    let base_type = make_int_type(b.base_type);
+
+    let bitflags_macro = rust::import("bitflags", "bitflags");
+
+    tok.push(
+        namespace.clone(),
+        quote! {
+            // NOTE: currently prettyplease ignores anything inside the macro call
+            // This is expected, but it leaves all the bitflags completely unformatted!
+            // Furthermore, even if we feed some formatted input to it it butchers it, discarding any formatting information
+            // I don't think it's possible to get nicer output using prettyplease without ditching bitflags! macro
+            $bitflags_macro! {
+                pub struct $name : $base_type {
+                    $(for arm in b.arms.iter() {
+                        const $(make_ident(&arm.name)) = $(format!("{:#x}", arm.value));
+                    })
+                }
+            }
+        },
+    );
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::swipc::codegen::types::gen_struct;
+    use crate::swipc::codegen::types::{gen_enum, gen_struct, get_bitflags};
     use crate::swipc::codegen::{import_in, TokenStorage};
     use crate::swipc::model::{IpcFile, IpcFileItem, NamespacedIdent};
     use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
@@ -111,17 +155,17 @@ mod tests {
     #[test]
     fn simple_struct() {
         let s = r#"
-struct HelloStruct : sf::LargeData {
-    /// This is a doc-comment (allowed only in certain places)
-    u8 aaaa;
-    /// 7 bytes of padding here (u64 should be 8-byte aligned)
-    u64 padded;
-    u16 bbbb;
-    /// 2 bytes of padding here (u32 should be 4-byte aligned)
-    u32 cccc;
-    u8 ddd;
-    /// 7 bytes of padding here (because the whole structure size should be 8-byte aligned to be able to be placed in an array)
-};
+            struct HelloStruct : sf::LargeData {
+                /// This is a doc-comment (allowed only in certain places)
+                u8 aaaa;
+                /// 7 bytes of padding here (u64 should be 8-byte aligned)
+                u64 padded;
+                u16 bbbb;
+                /// 2 bytes of padding here (u32 should be 4-byte aligned)
+                u32 cccc;
+                u8 ddd;
+                /// 7 bytes of padding here (because the whole structure size should be 8-byte aligned to be able to be placed in an array)
+            };
         "#;
 
         let file: IpcFile = unwrap_parse(s, parse_ipc_file);
@@ -163,6 +207,94 @@ struct HelloStruct : sf::LargeData {
                     let _ = ::core::mem::transmute::<HelloStruct, [u8; 32]>;
                 };
 
+            "}
+        )
+    }
+
+    #[test]
+    fn simple_enum() {
+        let s = r#"
+            enum HelloEnum : u16 {
+                HelloArm = 1,
+                HelloRam = 65535,
+                Lol = 2,
+            };
+        "#;
+
+        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+
+        let item = file.iter_items().next().unwrap();
+        // TODO: add an into_struct method or smth
+        let s = match item {
+            IpcFileItem::EnumDef(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut ts = TokenStorage::new();
+
+        gen_enum(&mut ts, file.context(), s);
+
+        let (_, res) = ts
+            .to_file_string()
+            .unwrap()
+            .into_iter()
+            .exactly_one()
+            .unwrap();
+
+        println!("{}", res);
+
+        assert_eq!(
+            res,
+            indoc! {"
+                #[repr(u16)]
+                pub enum HelloEnum {
+                    HelloArm = 1,
+                    HelloRam = 65535,
+                    Lol = 2,
+                }
+            "}
+        )
+    }
+
+    #[test]
+    fn simple_bitflags() {
+        let s = r#"
+            bitflags HelloEnum : u8 {
+                Arm1 = 0x1,
+                Arm2 = 0x2,
+                Arm12 = 0x3,
+            };
+        "#;
+
+        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+
+        let item = file.iter_items().next().unwrap();
+        // TODO: add an into_struct method or smth
+        let s = match item {
+            IpcFileItem::BitflagsDef(s) => s,
+            _ => unreachable!(),
+        };
+
+        let mut ts = TokenStorage::new();
+
+        get_bitflags(&mut ts, file.context(), s);
+
+        let (_, res) = ts
+            .to_file_string()
+            .unwrap()
+            .into_iter()
+            .exactly_one()
+            .unwrap();
+
+        println!("{}", res);
+
+        assert_eq!(
+            res,
+            indoc! {"
+                use bitflags::bitflags;
+                bitflags! {
+                    pub struct HelloEnum : u8 { const Arm1 = 0x1; const Arm2 = 0x2; const Arm12 = 0x3; }
+                }
             "}
         )
     }
