@@ -64,18 +64,28 @@ StructMarker: StructMarker = {
     "sf::PrefersAutoSelectTransferMode" => StructMarker::PrefersTransferMode(BufferTransferMode::AutoSelect),
 };
 
+StructField: StructField =
+    <l:@L>
+    Docs
+    <ty:NominalType> <name:LocalIdent>
+    <r:@R> ";"
+    => StructField {
+        name,
+        ty,
+        location: Span::new(file_id, l, r),
+    };
+
 pub StructDef: Struct =
     <l:@L>
+    Docs
     "struct" <name:Ident> <markers:(":" <Comma<StructMarker>>)?> "{"
-        <fields:(<@L> <NominalType> <LocalIdent> <@R>";")*>
+        <fields:(<StructField>)*>
+        // Allow docs here because.... Reasons (need for test readability, lol)
+        Docs
     "}" ";"
     <r:@R> =>? Struct::try_new(
                 name,
-                fields.into_iter().map(|(l, ty, name, r)| StructField {
-                    name,
-                    ty,
-                    location: Span::new(file_id, l, r),
-                }).collect(),
+                fields,
                 markers.unwrap_or_default(),
                 Span::new(file_id, l, r)
             ).map_err(|error| ParseError::User {
@@ -85,8 +95,9 @@ pub StructDef: Struct =
                          .collect(),
                  });
 
-pub EnumArm: EnumArm =
+EnumArm: EnumArm =
     <l:@L>
+    Docs
     <name:LocalIdent> "=" <value:Num>
     <r:@R> => EnumArm {
         name,
@@ -96,6 +107,7 @@ pub EnumArm: EnumArm =
 
 pub EnumDef: Enum =
     <l:@L>
+    Docs
     "enum" <name:Ident> ":" <base_type:IntType> "{"
         <arms:Comma<EnumArm>>
     "}" ";"
@@ -106,8 +118,9 @@ pub EnumDef: Enum =
         location: Span::new(file_id, l, r)
     };
 
-pub BitflagsArm: BitflagsArm =
+BitflagsArm: BitflagsArm =
     <l:@L>
+    Docs
     <name:LocalIdent> "=" <value:Num>
     <r:@R> => BitflagsArm {
         name,
@@ -117,6 +130,7 @@ pub BitflagsArm: BitflagsArm =
 
 pub BitflagsDef: Bitflags =
     <l:@L>
+    Docs
     "bitflags" <name:Ident> ":" <base_type:IntType> "{"
         <arms:Comma<BitflagsArm>>
     "}" ";"
@@ -202,8 +216,8 @@ InputSpec: (Option<ArcStr>, Arc<Value>) = {
     <v:Value> <n:LocalIdent> => (Some(n), Arc::new(v)),
 };
 
-CommandDocs: () = {
-    (r"#[^\n]*")*
+Docs: () = {
+    (r"///[^\S\r\n]*([^\r\n]*)")*
 };
 
 Version: () =
@@ -223,7 +237,7 @@ CommandDecorator: () = {
 };
 
 Command: Command =
-    CommandDocs
+    Docs
     CommandDecorator*
     <l:@L>
     "[" <id:Num> "]" <name:LocalIdent>

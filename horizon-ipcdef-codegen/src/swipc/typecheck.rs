@@ -2,7 +2,7 @@ use crate::swipc::diagnostics;
 use crate::swipc::diagnostics::{DiagnosticErrorExt, DiagnosticExt, DiagnosticResultExt};
 use crate::swipc::model::{
     Bitflags, BitflagsArm, Command, Enum, EnumArm, IntType, Interface, Struct, StructField,
-    TypeWithName, TypecheckContext, Value,
+    StructuralType, TypeWithName, TypecheckContext, Value,
 };
 use arcstr::ArcStr;
 use codespan_reporting::diagnostic::Diagnostic;
@@ -18,7 +18,7 @@ impl Value {
             | Value::InBuffer(_, _)
             | Value::OutBuffer(_, _) => Ok(()),
             Value::In(t) | Value::Out(t) | Value::InArray(t, _) | Value::OutArray(t, _) => {
-                t.resolve(context).map(|_| ())
+                t.typecheck_resolve(context).map(|_| ())
             }
             Value::InObject(obj, location) => context.resolve_interface(obj, location).map(|_| ()),
             Value::OutObject(obj, location) => obj
@@ -30,22 +30,31 @@ impl Value {
 }
 
 impl TypeWithName {
-    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
-        match self {
-            TypeWithName::TypeAlias(t) => {
-                t.referenced_type.resolve(context)?;
-                Ok(())
+    pub fn resolve_and_typecheck(
+        &self,
+        context: &TypecheckContext,
+    ) -> diagnostics::Result<StructuralType> {
+        Ok(match self {
+            TypeWithName::TypeAlias(t) => t.referenced_type.typecheck_resolve(context)?,
+            TypeWithName::StructDef(s) => {
+                s.typecheck(context)?;
+                StructuralType::Struct(s.clone())
             }
-            TypeWithName::StructDef(s) => s.typecheck(context),
-            TypeWithName::EnumDef(e) => e.typecheck(context),
-            TypeWithName::BitflagsDef(b) => b.typecheck(context),
-        }
+            TypeWithName::EnumDef(e) => {
+                e.typecheck(context)?;
+                StructuralType::Enum(e.clone())
+            }
+            TypeWithName::BitflagsDef(b) => {
+                b.typecheck(context)?;
+                StructuralType::Bitflags(b.clone())
+            }
+        })
     }
 }
 
 impl StructField {
     pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
-        match self.ty.resolve(context) {
+        match self.ty.typecheck_resolve(context) {
             Ok(t) => {
                 if !t.is_sized() {
                     return Err(vec![Diagnostic::error()
@@ -55,9 +64,7 @@ impl StructField {
 
                 Ok(())
             }
-            Err(e) => {
-                Err(e.with_context(self.location, || format!("In field `{}`", self.name)))
-            }
+            Err(e) => Err(e.with_context(self.location, || format!("In field `{}`", self.name))),
         }
     }
 }

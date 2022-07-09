@@ -13,7 +13,9 @@
 
 use lalrpop_util::lalrpop_mod;
 
+pub mod codegen;
 pub mod diagnostics;
+pub mod layout;
 pub mod model;
 mod typecheck;
 
@@ -53,7 +55,7 @@ mod tests {
         String::from_utf8(writer.into_inner()).expect("Non utf-8 error output...")
     }
 
-    fn unwrap_parse<T>(source: &str, parser: impl FnOnce(&str) -> Result<T, ParseError>) -> T {
+    pub fn unwrap_parse<T>(source: &str, parser: impl FnOnce(&str) -> Result<T, ParseError>) -> T {
         match parser(source) {
             Ok(r) => r,
             Err(error) => {
@@ -191,16 +193,16 @@ mod tests {
     fn idirectory_interface() {
         let s = r#"
 interface fssrv::sf::IDirectory {
-	# Takes a type-0x6 output buffer. Returns an output u64(?) for the total
-	# number of read entries, this is 0 when no more entries are available.
-	# 
-	# The output buffer contains the read array of
-	# [\#DirectoryEntry](http://switchbrew.org/index.php?title=Filesystem%20services#DirectoryEntry "wikilink").
-	# This doesn't include entries for "." and "..".
-	# 
+	/// Takes a type-0x6 output buffer. Returns an output u64(?) for the total
+	/// number of read entries, this is 0 when no more entries are available.
+	/// 
+	/// The output buffer contains the read array of
+	/// [\#DirectoryEntry](http://switchbrew.org/index.php?title=Filesystem%20services#DirectoryEntry "wikilink").
+	/// This doesn't include entries for "." and "..".
+	/// 
 	[0] Read(sf::Out<s64> out, sf::OutBuffer out_entries);
-	# Returns an u64 for the total number of readable entries.
-	# 
+	/// Returns an u64 for the total number of readable entries.
+	/// 
 	[1] GetEntryCount(sf::Out<s64> out);
 }
         "#;
@@ -213,23 +215,23 @@ interface fssrv::sf::IDirectory {
     fn iuserinterface_interface() {
         let s = r#"
 interface sm::detail::IUserInterface is sm: {
-	# Needs to be called before any other command may be used. On version 3.0.0
-	# and lower, if this function is not called, `GetService`, `RegisterService`
-	# and `UnregisterService` may be called without restriction, thanks to
-	# `sm:h`.
-	#
-	# # Arguments
-	# - `reserved`:  Should be set to 0.
+	/// Needs to be called before any other command may be used. On version 3.0.0
+	/// and lower, if this function is not called, `GetService`, `RegisterService`
+	/// and `UnregisterService` may be called without restriction, thanks to
+	/// `sm:h`.
+	///
+	/// # Arguments
+	/// - `reserved`:  Should be set to 0.
 	[0] Initialize(sf::ClientProcessId);
-	# Returns a handle to the given service. IPC messages may be sent to this
-	# handle through `svcSendSyncRequest`.
+	/// Returns a handle to the given service. IPC messages may be sent to this
+	/// handle through `svcSendSyncRequest`.
 	[1] GetService(ServiceName name, OutMoveHandle session_handle);
-	# Registers a service with the given name. The user can use
-	# `svcAcceptSession` on the returned handle to get a new Session handle, and
-	# use `svcReplyAndReceive` on those handles to reply to IPC requests.
+	/// Registers a service with the given name. The user can use
+	/// `svcAcceptSession` on the returned handle to get a new Session handle, and
+	/// use `svcReplyAndReceive` on those handles to reply to IPC requests.
 	[2] RegisterService(ServiceName name, u8, u32 maxHandles, OutMoveHandle port_handle);
-	# Unregisters the given service. Future `GetService` call will not return
-	# this service anymore, but existing handles will stay alive.
+	/// Unregisters the given service. Future `GetService` call will not return
+	/// this service anymore, but existing handles will stay alive.
 	[3] UnregisterService(ServiceName name);
 }
         "#;
@@ -238,7 +240,7 @@ interface sm::detail::IUserInterface is sm: {
         println!("{:#?}", interface);
     }
 
-    fn parse_ipc_file(s: &str) -> Result<IpcFile, ParseError> {
+    pub fn parse_ipc_file(s: &str) -> Result<IpcFile, ParseError> {
         parser::IpcFileParser::new().parse(0, s)
     }
 
@@ -424,5 +426,34 @@ interface ITest {
             parse_ipc_file,
             "Could not resolve interface named `ISomeUndefinedInterface`",
         );
+    }
+
+    #[test]
+    fn interface_file() {
+        let s = r#"
+interface ITest {
+    [1] Lol(u8 hello, u16 world, u8 i, u32 am, u16 a, b8 test);
+}
+        "#;
+        let file = unwrap_parse(s, parse_ipc_file);
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn struct_file() {
+        let s = r#"
+struct HelloStruct {
+    u8 aaaa;
+    u64 padded;
+    u16 bbbb;
+    u32 cccc;
+};
+
+type HelloStructAlias = HelloStruct;
+        "#;
+        let file = unwrap_parse(s, parse_ipc_file);
+
+        println!("{:#?}", file);
     }
 }

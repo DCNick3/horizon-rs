@@ -34,7 +34,7 @@ pub enum NominalType {
 }
 
 impl NominalType {
-    pub fn resolve_with_depth(
+    fn typecheck_resolve_with_depth(
         &self,
         context: &TypecheckContext,
         depth_limit: usize,
@@ -56,10 +56,8 @@ impl NominalType {
                             .with_primary_label(t.location)]);
                     }
 
-                    
-                    t
-                        .referenced_type
-                        .resolve_with_depth(context, depth_limit - 1)
+                    t.referenced_type
+                        .typecheck_resolve_with_depth(context, depth_limit - 1)
                         .with_context(reference_location, || {
                             format!("While resolving type named `{}`", name)
                         })?
@@ -71,8 +69,28 @@ impl NominalType {
         })
     }
 
-    pub fn resolve(&self, context: &TypecheckContext) -> diagnostics::Result<StructuralType> {
-        self.resolve_with_depth(context, 16)
+    pub fn typecheck_resolve(
+        &self,
+        context: &TypecheckContext,
+    ) -> diagnostics::Result<StructuralType> {
+        self.typecheck_resolve_with_depth(context, 16)
+    }
+
+    /// Resolve type in a codegen stage
+    /// This is supposed to be infallible because typecheck should have caught all unresolved references
+    pub fn codegen_resolve(&self, context: &CodegenContext) -> StructuralType {
+        match self {
+            &NominalType::Int(i) => StructuralType::Int(i),
+            NominalType::Bool => StructuralType::Bool,
+            NominalType::F32 => StructuralType::F32,
+            &NominalType::Bytes { size, alignment } => StructuralType::Bytes { size, alignment },
+            &NominalType::Unknown { size } => StructuralType::Unknown { size },
+            NominalType::TypeName { name, .. } => context
+                .resolved_type_names
+                .get(name)
+                .expect("Bug: unresolved reference slipped into codegen stage")
+                .clone(),
+        }
     }
 }
 
@@ -94,14 +112,6 @@ impl StructuralType {
             StructuralType::Unknown { size: None } => false,
             _ => true,
         }
-    }
-
-    pub fn size(&self) -> u64 {
-        todo!()
-    }
-
-    pub fn alignment(&self) -> u64 {
-        todo!()
     }
 
     pub fn preferred_transfer_mode(&self) -> BufferTransferMode {
@@ -298,9 +308,7 @@ impl Struct {
         markers: Vec<StructMarker>,
         location: Span,
     ) -> diagnostics::Result<Self> {
-        let is_large_data = markers
-            .iter()
-            .any(|v| v == &StructMarker::LargeData);
+        let is_large_data = markers.iter().any(|v| v == &StructMarker::LargeData);
         let preferred_transfer_mode = markers
             .iter()
             .filter_map(|v| match v {
@@ -478,10 +486,15 @@ impl TypecheckContext {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct IpcFile {
-    items: Vec<IpcFileItem>,
+pub struct CodegenContext {
     resolved_type_names: BTreeMap<ArcStr, StructuralType>,
     resolved_interfaces: BTreeMap<ArcStr, Arc<Interface>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IpcFile {
+    items: Vec<IpcFileItem>,
+    context: CodegenContext,
 }
 
 impl IpcFile {
@@ -489,7 +502,7 @@ impl IpcFile {
         let mut named_types = BTreeMap::new();
         let mut interfaces = BTreeMap::new();
 
-        let diagnostics = RefCell::new(Vec::new());
+        let res = RefCell::new(Ok(()));
 
         let mut try_add_named_type = |ty: TypeWithName| {
             let name = ty.name().clone();
@@ -499,7 +512,7 @@ impl IpcFile {
                     vac.insert(ty);
                 }
                 Entry::Occupied(occ) => {
-                    diagnostics.borrow_mut().push(
+                    res.borrow_mut().push(
                         Diagnostic::error()
                             .with_message(format!("Multiple definitions of type `{}`", name))
                             .with_primary_label(ty.location())
@@ -517,7 +530,7 @@ impl IpcFile {
                 Entry::Vacant(v) => {
                     v.insert(interface);
                 }
-                Entry::Occupied(o) => diagnostics.borrow_mut().push(
+                Entry::Occupied(o) => res.borrow_mut().push(
                     Diagnostic::error()
                         .with_message(format!(
                             "Multiple definitions of interface `{}`",
@@ -549,29 +562,38 @@ impl IpcFile {
             }
         }
 
-        let mut diagnostics = diagnostics.take();
+        let mut res = res.into_inner();
 
         let context = TypecheckContext {
             named_types,
             interfaces,
         };
 
+        let mut resolved_type_names = BTreeMap::new();
+
         for (_, named_type) in context.named_types.iter() {
-            if let Err(e) = named_type.typecheck(&context) {
-                diagnostics.extend(e);
+            if let Some(resolved) = res.extend_result(named_type.resolve_and_typecheck(&context)) {
+                resolved_type_names.insert(named_type.name().clone(), resolved);
             }
         }
 
         for (_, interface) in context.interfaces.iter() {
-            if let Err(e) = interface.typecheck(&context) {
-                diagnostics.extend(e);
-            }
+            res.extend_result(interface.typecheck(&context));
         }
 
-        if diagnostics.is_empty() {
-            todo!()
-        } else {
-            Err(diagnostics)
-        }
+        let context = CodegenContext {
+            resolved_interfaces: context.interfaces,
+            resolved_type_names,
+        };
+
+        res.map(|_| Self { items, context })
+    }
+
+    pub fn iter_items(&self) -> impl Iterator<Item = &IpcFileItem> {
+        self.items.iter()
+    }
+
+    pub fn context(&self) -> &CodegenContext {
+        &self.context
     }
 }
