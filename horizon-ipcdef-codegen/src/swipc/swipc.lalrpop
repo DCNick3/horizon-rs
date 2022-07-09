@@ -7,8 +7,9 @@ use crate::swipc::model::{
     NominalType, IntType, Struct, Enum, Bitflags, Interface,
     Command, Value, HandleTransferType, BufferTransferMode,
     StructMarker, BufferExtraAttrs, IpcFileItem, TypeAlias,
-    IpcFile, StructField, EnumArm, BitflagsArm, Span,
+    IpcFile, StructField, EnumArm, BitflagsArm,
 };
+use crate::swipc::diagnostics::Span;
 
 grammar(file_id: usize);
 

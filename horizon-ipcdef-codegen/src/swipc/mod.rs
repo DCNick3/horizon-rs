@@ -11,66 +11,21 @@
 //! - use atmosphere's sf::Out markers for outputs, removing the `->` part altogether
 //! - ???
 
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFiles;
-use lalrpop_util::lexer::Token;
-use lalrpop_util::{lalrpop_mod, ParseError};
+use lalrpop_util::lalrpop_mod;
 
+pub mod diagnostics;
 pub mod model;
 
 lalrpop_mod!(parser, "/swipc/swipc.rs");
 
-fn make_diagnostics<'source>(
-    source: &'source str,
-    error: ParseError<usize, Token<'source>, Vec<Diagnostic<usize>>>,
-) -> (
-    SimpleFiles<&'source str, &'source str>,
-    Vec<Diagnostic<usize>>,
-) {
-    let mut files = SimpleFiles::new();
-    let file_id = files.add("/dev/stdin", source);
-
-    let diagnostic = Diagnostic::error();
-
-    let diagnostic = match error {
-        ParseError::InvalidToken { location } => diagnostic
-            .with_message("Invalid token")
-            .with_labels(vec![Label::primary(file_id, location..location)]),
-        ParseError::UnrecognizedEOF { location, expected } => diagnostic
-            .with_message("Unrecognized EOF")
-            .with_labels(vec![Label::primary(file_id, location..location)])
-            .with_notes(vec![format!(
-                "Expected one of the following: {}",
-                expected.join(", ")
-            )]),
-        ParseError::UnrecognizedToken {
-            token: (start, t, end),
-            expected,
-        } => diagnostic
-            .with_message(format!("Unrecognized token: {}", t))
-            .with_labels(vec![Label::primary(file_id, start..end)])
-            .with_notes(vec![format!(
-                "Expected one of the following: {}",
-                expected.join(", ")
-            )]),
-        ParseError::ExtraToken {
-            token: (start, t, end),
-        } => diagnostic
-            .with_message(format!("Extra token: {}", t))
-            .with_labels(vec![Label::primary(file_id, start..end)]),
-        ParseError::User { error } => return (files, error),
-    };
-
-    (files, vec![diagnostic])
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::swipc::diagnostics::{diagnostic_error_from_parse_error, Span};
     use crate::swipc::model::{
-        BufferTransferMode, IntType, Interface, IpcFile, NominalType, Span, Struct, StructField,
+        BufferTransferMode, IntType, Interface, IpcFile, NominalType, Struct, StructField,
         TypeAlias,
     };
-    use crate::swipc::{make_diagnostics, parser};
+    use crate::swipc::parser;
     use codespan_reporting::diagnostic::Diagnostic;
     use codespan_reporting::term::termcolor::Buffer;
     use lalrpop_util::lexer::Token;
@@ -80,7 +35,7 @@ mod tests {
     type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, Vec<Diagnostic<usize>>>;
 
     fn display_error(source: &str, error: ParseError) -> String {
-        let (files, diagnostics) = make_diagnostics(source, error);
+        let (files, diagnostics) = diagnostic_error_from_parse_error(source, error);
 
         let mut writer = Buffer::ansi(); //StandardStream::stdout(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();

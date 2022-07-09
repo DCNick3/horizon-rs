@@ -1,73 +1,13 @@
+use crate::swipc::diagnostics;
+use crate::swipc::diagnostics::{DiagnosticErrorExt, DiagnosticExt, DiagnosticResultExt, Span};
 use arcstr::ArcStr;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::diagnostic::Diagnostic;
 use derivative::Derivative;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::ops::Range;
 use std::sync::Arc;
-
-type Result<T> = std::result::Result<T, Vec<Diagnostic<usize>>>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Span {
-    pub file_id: usize,
-    pub left: usize,
-    pub right: usize,
-}
-
-impl Span {
-    pub fn new(file_id: usize, left: usize, right: usize) -> Self {
-        Self {
-            file_id,
-            left,
-            right,
-        }
-    }
-
-    pub fn range(&self) -> Range<usize> {
-        self.left..self.right
-    }
-
-    pub fn primary_label(&self) -> Label<usize> {
-        Label::primary(self.file_id, self.range())
-    }
-    pub fn secondary_label(&self) -> Label<usize> {
-        Label::secondary(self.file_id, self.range())
-    }
-}
-
-impl From<&Span> for Span {
-    fn from(span: &Span) -> Self {
-        *span
-    }
-}
-
-trait DiagnosticExt<FileId> {
-    fn with_primary_label(self, location: impl Into<Span>) -> Diagnostic<FileId>;
-    fn with_secondary_label(
-        self,
-        location: impl Into<Span>,
-        message: impl Into<String>,
-    ) -> Diagnostic<FileId>;
-}
-
-impl DiagnosticExt<usize> for Diagnostic<usize> {
-    fn with_primary_label(self, location: impl Into<Span>) -> Diagnostic<usize> {
-        let location = location.into();
-        self.with_labels(vec![location.primary_label()])
-    }
-
-    fn with_secondary_label(
-        self,
-        location: impl Into<Span>,
-        message: impl Into<String>,
-    ) -> Diagnostic<usize> {
-        let location = location.into();
-        self.with_labels(vec![location.secondary_label().with_message(message)])
-    }
-}
 
 /// Types are those things that have a known byte representations
 /// Usually they will be sent as-is via the wire (put into the payload), but sometimes (structs with sf::LargeData marker) they would be sent as buffers instead
@@ -98,7 +38,7 @@ impl NominalType {
         &self,
         context: &TypecheckContext,
         depth_limit: usize,
-    ) -> Result<StructuralType> {
+    ) -> diagnostics::Result<StructuralType> {
         Ok(match self {
             &NominalType::Int(i) => StructuralType::Int(i),
             NominalType::Bool => StructuralType::Bool,
@@ -119,16 +59,8 @@ impl NominalType {
                     let ty = t
                         .referenced_type
                         .resolve_with_depth(context, depth_limit - 1)
-                        .map_err(|e| {
-                            e.into_iter()
-                                .map(|e| {
-                                    e.with_secondary_label(
-                                        reference_location,
-                                        format!("While resolving type named `{}`", name),
-                                    )
-                                    .with_secondary_label(t.location, "Defined as a typedef")
-                                })
-                                .collect::<Vec<_>>()
+                        .with_context(reference_location, || {
+                            format!("While resolving type named `{}`", name)
                         })?;
                     ty
                 }
@@ -139,7 +71,7 @@ impl NominalType {
         })
     }
 
-    pub fn resolve(&self, context: &TypecheckContext) -> Result<StructuralType> {
+    pub fn resolve(&self, context: &TypecheckContext) -> diagnostics::Result<StructuralType> {
         self.resolve_with_depth(context, 16)
     }
 }
@@ -275,7 +207,7 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
         match self {
             Value::ClientProcessId
             | Value::InHandle(_)
@@ -369,7 +301,7 @@ pub struct StructField {
 }
 
 impl StructField {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
         match self.ty.resolve(context) {
             Ok(t) => {
                 if !t.is_sized() {
@@ -381,12 +313,7 @@ impl StructField {
                 Ok(())
             }
             Err(e) => {
-                return Err(e
-                    .into_iter()
-                    .map(|e| {
-                        e.with_secondary_label(self.location, format!("In field `{}`", self.name))
-                    })
-                    .collect())
+                return Err(e.with_context(self.location, || format!("In field `{}`", self.name)))
             }
         }
     }
@@ -409,7 +336,7 @@ impl Struct {
         fields: Vec<StructField>,
         markers: Vec<StructMarker>,
         location: Span,
-    ) -> Result<Self> {
+    ) -> diagnostics::Result<Self> {
         let is_large_data = markers
             .iter()
             .find(|&v| v == &StructMarker::LargeData)
@@ -447,8 +374,8 @@ impl Struct {
         })
     }
 
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
-        let mut diags = Vec::new();
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
+        let mut res = Ok(());
 
         let mut fields = BTreeMap::new();
 
@@ -457,7 +384,7 @@ impl Struct {
                 Entry::Vacant(v) => {
                     v.insert(field);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate struct field `{}`", field.name,))
                         .with_primary_label(field.location)
@@ -465,18 +392,14 @@ impl Struct {
                 ),
             }
 
-            if let Err(e) = field.typecheck(context) {
-                diags.extend(e.into_iter().map(|e| {
-                    e.with_secondary_label(self.location, format!("In struct `{}`", self.name))
-                }))
-            }
+            res.extend_result(
+                field
+                    .typecheck(context)
+                    .with_context(self.location, || format!("In struct `{}`", self.name)),
+            );
         }
 
-        if diags.is_empty() {
-            Ok(())
-        } else {
-            Err(diags)
-        }
+        res
     }
 }
 
@@ -490,7 +413,11 @@ pub struct EnumArm {
 }
 
 impl EnumArm {
-    pub fn typecheck(&self, _context: &TypecheckContext, base_type: IntType) -> Result<()> {
+    pub fn typecheck(
+        &self,
+        _context: &TypecheckContext,
+        base_type: IntType,
+    ) -> diagnostics::Result<()> {
         if !base_type.fits_u64(self.value) {
             return Err(vec![Diagnostic::error()
                 .with_message(format!(
@@ -514,24 +441,23 @@ pub struct Enum {
 }
 
 impl Enum {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
-        let mut diags = Vec::new();
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
+        let mut res = Ok(());
 
         let mut arm_values: BTreeMap<u64, &EnumArm> = BTreeMap::new();
         let mut arm_names: BTreeMap<&ArcStr, &EnumArm> = BTreeMap::new();
 
         for arm in self.arms.iter() {
-            if let Err(e) = arm.typecheck(context, self.base_type) {
-                diags.extend(e.into_iter().map(|e| {
-                    e.with_secondary_label(self.location, format!("In enum `{}`", self.name))
-                }))
-            }
+            res.extend_result(
+                arm.typecheck(context, self.base_type)
+                    .with_context(self.location, || format!("In enum `{}`", self.name)),
+            );
 
             match arm_values.entry(arm.value) {
                 Entry::Vacant(e) => {
                     e.insert(arm);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate enum value"))
                         .with_primary_label(arm.location)
@@ -543,7 +469,7 @@ impl Enum {
                 Entry::Vacant(e) => {
                     e.insert(arm);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate enum arm named `{}`", arm.name,))
                         .with_primary_label(arm.location)
@@ -552,11 +478,7 @@ impl Enum {
             }
         }
 
-        if diags.is_empty() {
-            Ok(())
-        } else {
-            Err(diags)
-        }
+        res
     }
 }
 
@@ -570,7 +492,11 @@ pub struct BitflagsArm {
 }
 
 impl BitflagsArm {
-    pub fn typecheck(&self, _context: &TypecheckContext, base_type: IntType) -> Result<()> {
+    pub fn typecheck(
+        &self,
+        _context: &TypecheckContext,
+        base_type: IntType,
+    ) -> diagnostics::Result<()> {
         if !base_type.fits_u64(self.value) {
             return Err(vec![Diagnostic::error()
                 .with_message(format!(
@@ -594,23 +520,22 @@ pub struct Bitflags {
 }
 
 impl Bitflags {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
-        let mut diags = Vec::new();
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
+        let mut res = Ok(());
 
         let mut arm_names: BTreeMap<&ArcStr, &BitflagsArm> = BTreeMap::new();
 
         for arm in self.arms.iter() {
-            if let Err(e) = arm.typecheck(context, self.base_type) {
-                diags.extend(e.into_iter().map(|e| {
-                    e.with_secondary_label(self.location, format!("In bitflags `{}`", self.name))
-                }))
-            }
+            res.extend_result(
+                arm.typecheck(context, self.base_type)
+                    .with_context(self.location, || format!("In bitflags `{}`", self.name)),
+            );
 
             match arm_names.entry(&arm.name) {
                 Entry::Vacant(e) => {
                     e.insert(arm);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate bitfield arm named `{}`", arm.name,))
                         .with_primary_label(arm.location)
@@ -619,11 +544,7 @@ impl Bitflags {
             }
         }
 
-        if diags.is_empty() {
-            Ok(())
-        } else {
-            Err(diags)
-        }
+        res
     }
 }
 
@@ -640,22 +561,17 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
-        let mut diags = Vec::new();
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
+        let mut res = Ok(());
 
         for (_, arg) in self.arguments.iter() {
-            if let Err(e) = arg.typecheck(context) {
-                diags.extend(e.into_iter().map(|e| {
-                    e.with_secondary_label(self.location, format!("In command `{}`", self.name))
-                }))
-            }
+            res.extend_result(
+                arg.typecheck(context)
+                    .with_context(self.location, || format!("In command `{}`", self.name)),
+            );
         }
 
-        if diags.is_empty() {
-            Ok(())
-        } else {
-            Err(diags)
-        }
+        res
     }
 }
 
@@ -670,24 +586,24 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
-        let mut diags = Vec::new();
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
+        let mut res = Ok(());
 
         let mut command_names = BTreeMap::new();
         let mut command_ids = BTreeMap::new();
 
         for command in self.commands.iter() {
-            if let Err(e) = command.typecheck(context) {
-                diags.extend(e.into_iter().map(|e| {
-                    e.with_secondary_label(self.location, format!("In interface `{}`", self.name))
-                }))
-            }
+            res.extend_result(
+                command
+                    .typecheck(context)
+                    .with_context(self.location, || format!("In command `{}`", self.name)),
+            );
 
             match command_names.entry(&command.name) {
                 Entry::Vacant(v) => {
                     v.insert(command);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate command named `{}`", command.name))
                         .with_primary_label(command.location)
@@ -703,7 +619,7 @@ impl Interface {
                 Entry::Vacant(v) => {
                     v.insert(command);
                 }
-                Entry::Occupied(o) => diags.push(
+                Entry::Occupied(o) => res.push(
                     Diagnostic::error()
                         .with_message(format!("Duplicate command with id `{}`", command.id))
                         .with_primary_label(command.location)
@@ -716,11 +632,7 @@ impl Interface {
             }
         }
 
-        if diags.is_empty() {
-            Ok(())
-        } else {
-            Err(diags)
-        }
+        res
     }
 }
 
@@ -751,7 +663,7 @@ pub enum TypeWithName {
 }
 
 impl TypeWithName {
-    pub fn typecheck(&self, context: &TypecheckContext) -> Result<()> {
+    pub fn typecheck(&self, context: &TypecheckContext) -> diagnostics::Result<()> {
         match self {
             TypeWithName::TypeAlias(t) => {
                 t.referenced_type.resolve(context)?;
@@ -791,7 +703,11 @@ pub struct TypecheckContext {
 }
 
 impl TypecheckContext {
-    pub fn resolve_type(&self, name: &ArcStr, reference_location: &Span) -> Result<TypeWithName> {
+    pub fn resolve_type(
+        &self,
+        name: &ArcStr,
+        reference_location: &Span,
+    ) -> diagnostics::Result<TypeWithName> {
         if let Some(t) = self.named_types.get(name) {
             Ok(t.clone())
         } else {
@@ -805,7 +721,7 @@ impl TypecheckContext {
         &self,
         name: &ArcStr,
         reference_location: &Span,
-    ) -> Result<Arc<Interface>> {
+    ) -> diagnostics::Result<Arc<Interface>> {
         if let Some(t) = self.interfaces.get(name) {
             Ok(t.clone())
         } else {
@@ -824,7 +740,7 @@ pub struct IpcFile {
 }
 
 impl IpcFile {
-    pub fn try_new(items: Vec<IpcFileItem>) -> Result<Self> {
+    pub fn try_new(items: Vec<IpcFileItem>) -> diagnostics::Result<Self> {
         let mut named_types = BTreeMap::new();
         let mut interfaces = BTreeMap::new();
 
