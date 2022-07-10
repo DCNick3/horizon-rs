@@ -58,7 +58,7 @@ pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
             #[repr(C)]
             pub struct $name {
                 $(for f in s.fields.iter() {
-                    $(make_ident(&f.name)): $(make_nominal_type(namespace, &f.ty)),
+                    pub $(make_ident(&f.name)): $(make_nominal_type(namespace, &f.ty)),
                 })
             }
 
@@ -124,7 +124,7 @@ pub fn gen_type_alias(tok: &mut TokenStorage, _ctx: &CodegenContext, a: &TypeAli
     tok.push(
         namespace.clone(),
         quote! {
-            type $name = $ty;
+            pub type $name = $ty;
         },
     );
 }
@@ -133,8 +133,8 @@ pub fn gen_type_alias(tok: &mut TokenStorage, _ctx: &CodegenContext, a: &TypeAli
 mod tests {
     use crate::swipc::codegen::types::{gen_bitflags, gen_enum, gen_struct, gen_type_alias};
     use crate::swipc::codegen::{import_in, TokenStorage};
-    use crate::swipc::model::{IpcFile, IpcFileItem, NamespacedIdent};
-    use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
+    use crate::swipc::model::{IpcFileItem, NamespacedIdent, TypecheckedIpcFile};
+    use crate::swipc::tests::{parse_typechecked_ipc_file, unwrap_parse};
     use indoc::indoc;
     use itertools::Itertools;
 
@@ -182,7 +182,7 @@ mod tests {
             };
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
@@ -207,14 +207,15 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
+                #![allow(clippy::all)]
                 /// This struct is marked with sf::LargeData
                 #[repr(C)]
                 pub struct HelloStruct {
-                    aaaa: u8,
-                    padded: u64,
-                    bbbb: u16,
-                    cccc: u32,
-                    ddd: u8,
+                    pub aaaa: u8,
+                    pub padded: u64,
+                    pub bbbb: u16,
+                    pub cccc: u32,
+                    pub ddd: u8,
                 }
                 // Static size check for HelloStruct (expect 32 bytes)
                 const _: fn() = || {
@@ -235,7 +236,7 @@ mod tests {
             };
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
@@ -260,6 +261,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
+                #![allow(clippy::all)]
                 #[repr(u16)]
                 pub enum HelloEnum {
                     HelloArm = 1,
@@ -280,7 +282,7 @@ mod tests {
             };
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
@@ -305,6 +307,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
+                #![allow(clippy::all)]
                 use bitflags::bitflags;
                 bitflags! {
                     pub struct HelloEnum : u8 { const Arm1 = 0x1; const Arm2 = 0x2; const Arm12 = 0x3; }
@@ -319,7 +322,7 @@ mod tests {
             type HelloAlias = sf::Bytes<0x1000>;
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
@@ -344,7 +347,8 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
-                type HelloAlias = [u8; 4096];
+                #![allow(clippy::all)]
+                pub type HelloAlias = [u8; 4096];
             "}
         )
     }

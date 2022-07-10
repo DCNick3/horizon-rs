@@ -9,6 +9,7 @@ members = [
     "horizon-global",
     "horizon-sync",
     "horizon-ipc",
+    "horizon-ipcdef",
     "horizon-ipcdef-codegen",
 ]
 

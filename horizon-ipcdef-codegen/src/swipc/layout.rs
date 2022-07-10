@@ -139,8 +139,8 @@ impl Struct {
 #[cfg(test)]
 mod tests {
     use crate::swipc::layout::StructLayout;
-    use crate::swipc::model::{IpcFile, IpcFileItem};
-    use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
+    use crate::swipc::model::{IpcFileItem, TypecheckedIpcFile};
+    use crate::swipc::tests::{parse_typechecked_ipc_file, unwrap_parse};
 
     #[test]
     fn simple_struct_layout() {
@@ -158,7 +158,7 @@ struct HelloStruct {
 };
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth

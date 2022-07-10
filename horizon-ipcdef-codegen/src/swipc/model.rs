@@ -578,11 +578,30 @@ pub struct CodegenContext {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct IpcFile {
+    pub items: Vec<IpcFileItem>,
+}
+
+impl IpcFile {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn merge_with(&mut self, another: IpcFile) {
+        self.items.extend(another.items)
+    }
+
+    pub fn typecheck(self) -> diagnostics::Result<TypecheckedIpcFile> {
+        TypecheckedIpcFile::try_new(self.items)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypecheckedIpcFile {
     items: Vec<IpcFileItem>,
     context: CodegenContext,
 }
 
-impl IpcFile {
+impl TypecheckedIpcFile {
     pub fn try_new(items: Vec<IpcFileItem>) -> diagnostics::Result<Self> {
         let mut named_types = BTreeMap::new();
         let mut interfaces = BTreeMap::new();

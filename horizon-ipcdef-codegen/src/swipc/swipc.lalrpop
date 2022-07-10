@@ -276,8 +276,7 @@ pub Item: IpcFileItem = {
     <i:InterfaceDef> => IpcFileItem::InterfaceDef(Arc::new(i)),
 };
 
-pub IpcFile: IpcFile = <i:(Item)*> =>?
- IpcFile::try_new(i)
- .map_err(|error| {
-    ParseError::User { error }
- });
+pub IpcFile: IpcFile = <items:(Item)*> =>
+    IpcFile {
+        items
+    };

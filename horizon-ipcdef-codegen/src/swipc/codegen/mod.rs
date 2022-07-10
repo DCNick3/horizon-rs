@@ -1,6 +1,8 @@
 use crate::swipc::codegen::interface::gen_interface;
 use crate::swipc::codegen::types::{gen_bitflags, gen_enum, gen_struct, gen_type_alias};
-use crate::swipc::model::{CodegenContext, IpcFile, IpcFileItem, Namespace, NamespacedIdent};
+use crate::swipc::model::{
+    CodegenContext, IpcFileItem, Namespace, NamespacedIdent, TypecheckedIpcFile,
+};
 use anyhow::Context;
 use arcstr::ArcStr;
 use genco::fmt::Indentation;
@@ -95,9 +97,14 @@ pub struct TokenStorage {
 
 impl TokenStorage {
     pub fn new() -> Self {
-        Self {
+        let mut res = Self {
             storage: BTreeMap::new(),
-        }
+        };
+
+        // add an dummy root file to generate at least a `mod.rs` on empty input
+        res.push(Namespace::new(Vec::new()), Tokens::new());
+
+        res
     }
 
     pub fn push(&mut self, namespace: Namespace, tokens: Tokens) {
@@ -159,6 +166,17 @@ impl TokenStorage {
 
                 let contents = w.into_inner();
 
+                let contents = if ns.is_empty() {
+                    // ns is empty => we are at the root of the generated tree
+                    // suppress various lints here
+                    // we do it as a plain-text append because genco puts imports above everything
+                    //   and it's a no-no for module-level attributes
+                    // TODO: report to genco
+                    format!("#![allow(clippy::all)]\n{}", contents)
+                } else {
+                    contents
+                };
+
                 let formatter = make_formatter();
                 let contents = formatter
                     .format_str(contents)
@@ -176,7 +194,7 @@ fn make_formatter() -> impl rust_format::Formatter {
     rust_format::PrettyPlease::from_config(config)
 }
 
-fn gen_ipc_file(tok: &mut TokenStorage, ctx: &CodegenContext, f: &IpcFile) {
+pub fn gen_ipc_file(tok: &mut TokenStorage, ctx: &CodegenContext, f: &TypecheckedIpcFile) {
     for item in f.iter_items() {
         match item {
             IpcFileItem::TypeAlias(a) => gen_type_alias(tok, ctx, a),
@@ -191,8 +209,8 @@ fn gen_ipc_file(tok: &mut TokenStorage, ctx: &CodegenContext, f: &IpcFile) {
 #[cfg(test)]
 mod tests {
     use crate::swipc::codegen::{gen_ipc_file, TokenStorage};
-    use crate::swipc::model::IpcFile;
-    use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
+    use crate::swipc::model::TypecheckedIpcFile;
+    use crate::swipc::tests::{parse_typechecked_ipc_file, unwrap_parse};
     use indoc::indoc;
 
     #[test]
@@ -209,7 +227,7 @@ mod tests {
             type ns3::nested::HelloAlias2 = ns3::HelloAlias;
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let mut ts = TokenStorage::new();
 
@@ -226,6 +244,7 @@ mod tests {
             (
                 "mod.rs",
                 indoc! {"
+                    #![allow(clippy::all)]
                     mod ns1;
                     mod ns2;
                     mod ns3;
@@ -237,7 +256,7 @@ mod tests {
                     use super::ns2::Enum1;
                     #[repr(C)]
                     pub struct Struct1 {
-                        test: Enum1,
+                        pub test: Enum1,
                     }
                     // Static size check for Struct1 (expect 4 bytes)
                     const _: fn() = || {
@@ -261,14 +280,14 @@ mod tests {
                 indoc! {"
                     use super::ns1::Struct1;
                     mod nested;
-                    type HelloAlias = Struct1;
+                    pub type HelloAlias = Struct1;
                 "},
             ),
             (
                 "ns3/nested/mod.rs",
                 indoc! {"
                     use super::HelloAlias;
-                    type HelloAlias2 = HelloAlias;
+                    pub type HelloAlias2 = HelloAlias;
                 "},
             ),
         ]

@@ -4,6 +4,7 @@ use scraper::{Html, Selector};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
+pub mod cli;
 pub mod ipc_parse;
 
 const NINUPDATES_BASE_URL: &str = "https://yls8.mtheall.com/ninupdates";

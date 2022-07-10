@@ -5,16 +5,23 @@ use lalrpop_util::lexer::Token;
 use lalrpop_util::ParseError;
 use std::ops::Range;
 
-pub fn diagnostic_error_from_parse_error<'source>(
+pub fn diagnostics_and_files_from_parse_error<'source>(
     source: &'source str,
     error: ParseError<usize, Token<'source>, Vec<Diagnostic<usize>>>,
-) -> (
-    SimpleFiles<&'source str, &'source str>,
-    Vec<Diagnostic<usize>>,
-) {
+) -> (SimpleFiles<&'source str, &'source str>, Error) {
     let mut files = SimpleFiles::new();
     let file_id = files.add("/dev/stdin", source);
 
+    let error = diagnostics_from_parse_error(file_id, source, error);
+
+    (files, error)
+}
+
+pub fn diagnostics_from_parse_error<'source>(
+    file_id: usize,
+    _source: &'source str,
+    error: ParseError<usize, Token<'source>, Vec<Diagnostic<usize>>>,
+) -> Error {
     let diagnostic = Diagnostic::error();
 
     let diagnostic = match error {
@@ -43,10 +50,10 @@ pub fn diagnostic_error_from_parse_error<'source>(
         } => diagnostic
             .with_message(format!("Extra token: {}", t))
             .with_labels(vec![Label::primary(file_id, start..end)]),
-        ParseError::User { error } => return (files, error),
+        ParseError::User { error } => return error,
     };
 
-    (files, vec![diagnostic])
+    vec![diagnostic]
 }
 
 pub type Error = Vec<Diagnostic<usize>>;

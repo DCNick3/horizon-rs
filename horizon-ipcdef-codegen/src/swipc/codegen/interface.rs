@@ -23,6 +23,12 @@ fn make_result() -> Tokens {
     quote!($imp)
 }
 
+fn make_raw_handle() -> Tokens {
+    let imp = rust::import("horizon_ipc", "RawHandle");
+
+    quote!($imp)
+}
+
 fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext, c: &Command) {
     let mut args = Vec::new();
 
@@ -69,7 +75,10 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
                 todo!()
             }
             Value::OutHandle(_) => {
-                todo!()
+                // we just emit a RawHandle out param no matter what
+                quote! {
+                    $name: &mut $(make_raw_handle())
+                }
             }
             Value::InArray(_, _) => {
                 todo!()
@@ -130,8 +139,8 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
 mod tests {
     use crate::swipc::codegen::interface::gen_interface;
     use crate::swipc::codegen::TokenStorage;
-    use crate::swipc::model::{IpcFile, IpcFileItem};
-    use crate::swipc::tests::{parse_ipc_file, unwrap_parse};
+    use crate::swipc::model::{IpcFileItem, TypecheckedIpcFile};
+    use crate::swipc::tests::{parse_typechecked_ipc_file, unwrap_parse};
     use indoc::indoc;
     use itertools::Itertools;
 
@@ -144,7 +153,7 @@ mod tests {
             }
         "#;
 
-        let file: IpcFile = unwrap_parse(s, parse_ipc_file);
+        let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
 
         let item = file.iter_items().next().unwrap();
         // TODO: add an into_struct method or smth
@@ -169,6 +178,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {r#"
+                #![allow(clippy::all)]
                 use horizon_error::Result;
                 use horizon_ipc::cmif::SessionHandle;
                 pub struct IHelloInterface {

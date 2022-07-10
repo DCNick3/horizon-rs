@@ -1,0 +1,27 @@
+struct sm::ServiceName {
+    sf::Bytes<8> name;
+};
+
+interface sm::IUserInterface is "sm:" {
+	/// Needs to be called before any other command may be used. On version 3.0.0
+	/// and lower, if this function is not called, `GetService`, `RegisterService`
+	/// and `UnregisterService` may be called without restriction, thanks to
+	/// `sm:h`.
+	///
+	/// # Arguments
+	/// - `reserved`:  Should be set to 0.
+	[0] Initialize(sf::ClientProcessId);
+
+	/// Returns a handle to the given service. IPC messages may be sent to this
+	/// handle through `svcSendSyncRequest`.
+	[1] GetService(sm::ServiceName name, sf::OutMoveHandle session_handle);
+
+	/// Registers a service with the given name. The user can use
+	/// `svcAcceptSession` on the returned handle to get a new Session handle, and
+	/// use `svcReplyAndReceive` on those handles to reply to IPC requests.
+	[2] RegisterService(sm::ServiceName name, u32 max_sessions, b8 is_light, sf::OutMoveHandle port_handle);
+
+	/// Unregisters the given service. Future `GetService` call will not return
+	/// this service anymore, but existing handles will stay alive.
+	[3] UnregisterService(sm::ServiceName name);
+}

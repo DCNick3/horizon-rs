@@ -14,6 +14,7 @@
 
 use lalrpop_util::lalrpop_mod;
 
+pub mod cli;
 pub mod codegen;
 pub mod diagnostics;
 pub mod layout;
@@ -29,10 +30,10 @@ lalrpop_mod!(
 
 #[cfg(test)]
 mod tests {
-    use crate::swipc::diagnostics::{diagnostic_error_from_parse_error, Span};
+    use crate::swipc::diagnostics::{diagnostics_and_files_from_parse_error, Span};
     use crate::swipc::model::{
-        BufferTransferMode, IntType, Interface, IpcFile, NamespacedIdent, NominalType, Struct,
-        StructField, TypeAlias,
+        BufferTransferMode, IntType, Interface, NamespacedIdent, NominalType, Struct, StructField,
+        TypeAlias, TypecheckedIpcFile,
     };
     use crate::swipc::parser;
     use codespan_reporting::diagnostic::Diagnostic;
@@ -44,7 +45,7 @@ mod tests {
     type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, Vec<Diagnostic<usize>>>;
 
     fn display_error(source: &str, error: ParseError) -> String {
-        let (files, diagnostics) = diagnostic_error_from_parse_error(source, error);
+        let (files, diagnostics) = diagnostics_and_files_from_parse_error(source, error);
 
         let mut writer = Buffer::ansi();
         let config = codespan_reporting::term::Config::default();
@@ -247,8 +248,11 @@ interface sm::detail::IUserInterface is "sm:" {
         assert_eq!(interface.sm_names, vec!["sm:"]);
     }
 
-    pub fn parse_ipc_file(s: &str) -> Result<IpcFile, ParseError> {
-        parser::IpcFileParser::new().parse(0, s)
+    pub fn parse_typechecked_ipc_file(s: &str) -> Result<TypecheckedIpcFile, ParseError> {
+        parser::IpcFileParser::new()
+            .parse(0, s)?
+            .typecheck()
+            .map_err(|error| ParseError::User { error })
     }
 
     #[test]
@@ -262,7 +266,11 @@ struct a {};
 struct b {};
 type c = a;
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Multiple definitions of type `a`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Multiple definitions of type `a`",
+        );
     }
 
     #[test]
@@ -272,7 +280,7 @@ type t = undefined_type;
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Could not resolve type named `undefined_type`",
         );
     }
@@ -286,7 +294,7 @@ struct s {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Could not resolve type named `undefined_type`",
         );
     }
@@ -301,7 +309,7 @@ struct test {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Use of unsized type in field `unsized_value`",
         );
     }
@@ -317,7 +325,7 @@ enum test : u8 {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Value 256 of enum arm `large` does not fit into type U8",
         );
     }
@@ -333,7 +341,7 @@ enum test : u8 {
     two_2 = 2,
 };
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate enum value");
+        unwrap_err_parse(s, parse_typechecked_ipc_file, "Duplicate enum value");
     }
 
     #[test]
@@ -344,7 +352,11 @@ enum test : u8 {
     name = 2,
 };
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate enum arm named `name`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Duplicate enum arm named `name`",
+        );
     }
 
     #[test]
@@ -355,7 +367,11 @@ struct test {
     u16 one;
 };
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate struct field `one`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Duplicate struct field `one`",
+        );
     }
 
     #[test]
@@ -369,7 +385,7 @@ bitflags test : u8 {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Value 256 of bitflags arm `large` does not fit into type U8",
         );
     }
@@ -382,7 +398,11 @@ bitflags test : u8 {
     one = 2,
 };
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate bitfield arm named `one`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Duplicate bitfield arm named `one`",
+        );
     }
 
     #[test]
@@ -393,7 +413,11 @@ interface ITest {
     [1] Kek();
 }
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate command with id `1`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Duplicate command with id `1`",
+        );
     }
 
     #[test]
@@ -404,7 +428,11 @@ interface ITest {
     [2] Lol();
 }
         "#;
-        unwrap_err_parse(s, parse_ipc_file, "Duplicate command named `Lol`");
+        unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Duplicate command named `Lol`",
+        );
     }
 
     #[test]
@@ -416,7 +444,7 @@ interface ITest {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Could not resolve type named `undefined_type`",
         );
     }
@@ -430,7 +458,7 @@ interface ITest {
         "#;
         unwrap_err_parse(
             s,
-            parse_ipc_file,
+            parse_typechecked_ipc_file,
             "Could not resolve interface named `ISomeUndefinedInterface`",
         );
     }
@@ -442,7 +470,7 @@ interface ITest {
     [1] Lol(u8 hello, u16 world, u8 i, u32 am, u16 a, b8 test);
 }
         "#;
-        let file = unwrap_parse(s, parse_ipc_file);
+        let file = unwrap_parse(s, parse_typechecked_ipc_file);
 
         println!("{:#?}", file);
     }
@@ -459,7 +487,7 @@ struct HelloStruct {
 
 type HelloStructAlias = HelloStruct;
         "#;
-        let file = unwrap_parse(s, parse_ipc_file);
+        let file = unwrap_parse(s, parse_typechecked_ipc_file);
 
         println!("{:#?}", file);
     }
