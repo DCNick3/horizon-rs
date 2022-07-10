@@ -14,13 +14,13 @@ pub struct IUserInterface {
     handle: SessionHandle,
 }
 impl IUserInterface {
-    fn Initialize() -> Result<()> {
+    fn initialize() -> Result<()> {
         todo!("Command codegen")
     }
-    fn GetService(name: ServiceName, session_handle: &mut RawHandle) -> Result<()> {
+    fn get_service(name: ServiceName, session_handle: &mut RawHandle) -> Result<()> {
         todo!("Command codegen")
     }
-    fn RegisterService(
+    fn register_service(
         name: ServiceName,
         max_sessions: u32,
         is_light: bool,
@@ -28,7 +28,7 @@ impl IUserInterface {
     ) -> Result<()> {
         todo!("Command codegen")
     }
-    fn UnregisterService(name: ServiceName) -> Result<()> {
+    fn unregister_service(name: ServiceName) -> Result<()> {
         todo!("Command codegen")
     }
 }

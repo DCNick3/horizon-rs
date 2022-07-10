@@ -2,6 +2,7 @@ use crate::swipc::codegen::types::make_nominal_type;
 use crate::swipc::codegen::{make_ident, TokenStorage};
 use crate::swipc::model::{CodegenContext, Command, Interface, Namespace, Value};
 use arcstr::ArcStr;
+use convert_case::{Case, Casing};
 use genco::lang::rust::Tokens;
 use genco::prelude::*;
 
@@ -97,8 +98,10 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
         args.push(tok);
     }
 
+    // we expect command names in PascalCase, but convert them to snake_case when converting to rust
+    let name = c.name.to_case(Case::Snake);
     quote_in! { *tok =>
-        fn $(c.name.as_str())(
+        fn $name(
             $(for arg in args join (,) => $arg)
         ) -> $(make_result())<()> {
             todo!("Command codegen")
@@ -185,10 +188,10 @@ mod tests {
                     handle: SessionHandle,
                 }
                 impl IHelloInterface {
-                    fn HelloCommand() -> Result<()> {
+                    fn hello_command() -> Result<()> {
                         todo!("Command codegen")
                     }
-                    fn HelloCommand1(
+                    fn hello_command_1(
                         input_1: u8,
                         unnamed_2: &mut u32,
                         input_2: u16,
