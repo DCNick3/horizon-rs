@@ -36,11 +36,17 @@ NamespacedIdent: NamespacedIdent = <namespace:(<LocalIdent> "::")*> <id:LocalIde
     NamespacedIdent::new(Arc::new(namespace), id)
 };
 
-LocalIdent: ArcStr = <s:r"[a-zA-Z_]\w*"> => ArcStr::from(s);
+LocalIdent: ArcStr = {
+    <s:r"[a-zA-Z_]\w*"> => ArcStr::from(s),
+    // this is a way to allow for contextual keywords
+    // just a lalrpop quirk
+    // though an identifier can't be called type because rust has such a kw, lol
+    // "type" => ArcStr::from("type"),
+};
 
 // Note: this allows stuff like "hello : lol" due to us not having a custom lexer
 // I think it's okay for now, but maybe we would want to do something about it =)
-ServiceName: ArcStr = <s:r#""([\d\w:]*)""#> => {
+ServiceName: ArcStr = <s:r#""([\d\w:-]*)""#> => {
     ArcStr::from(&s[1..s.len()-1])
 };
 

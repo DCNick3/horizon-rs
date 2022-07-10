@@ -1,0 +1,112 @@
+
+struct fssrv::FsSaveDataCreationInfo {
+    /// Size of the save data.
+    s64 save_data_size;
+
+    /// Journal size of the save data.
+    s64 journal_size;
+
+    /// AvailableSize
+    u64 available_size;
+
+    /// ProgramId of the owner of this save data. 0 for ::FsSaveDataType_System.
+    u64 owner_id;
+
+    /// \ref FsSaveDataFlags
+    u32 flags;
+
+    /// \ref FsSaveDataSpaceId
+    u8 save_data_space_id;
+
+    /// 0 for ::FsSaveDataType_System.
+    u8 unk;
+
+    /// Uninitialized for ::FsSaveDataType_System.
+    sf::Bytes<0x1a> padding;
+};
+
+struct fssrv::FsSaveDataAttribute {
+    /// ApplicationId of the savedata to access when accessing other programs' savedata via SaveData, otherwise FS_SAVEDATA_CURRENT_APPLICATIONID.
+    u64 application_id;
+
+    /// \ref AccountUid for the user-specific savedata to access, otherwise 0 for common savedata.
+    account::Uid uid;
+
+    /// SystemSaveDataId, 0 for ::FsSaveDataType_Account.
+    u64 system_save_data_id;
+
+    /// \ref FsSaveDataType
+    u8 save_data_type;
+
+    /// \ref FsSaveDataRank
+    u8 save_data_rank;
+
+    /// SaveDataIndex
+    u16 save_data_index;
+
+    /// Padding.
+    /// TODO: currently naming check is being unreasonable here, we want to keep the `pad_x24` name
+    u32 pad_x_24;
+
+    /// 0 for ::FsSaveDataType_System/::FsSaveDataType_Account.
+    u64 unk_x_28;
+
+    /// 0 for ::FsSaveDataType_System/::FsSaveDataType_Account.
+    u64 unk_x_30;
+
+    /// 0 for ::FsSaveDataType_System/::FsSaveDataType_Account.
+    u64 unk_x_38;
+};
+
+struct fssrv::DirectoryEntry {
+	sf::Bytes<0x301> path;
+	sf::Bytes<3> pad;
+
+	i8 typ;
+	sf::Bytes<3> pad_2;
+
+	i64 filesize;
+};
+
+enum fssrv::Partition : u32 {
+	BootPartition1Root = 0,
+	BootPartition2Root = 10,
+	UserDataRoot = 20,
+	BootConfigAndPackage2Part1 = 21,
+	BootConfigAndPackage2Part2 = 22,
+	BootConfigAndPackage2Part3 = 23,
+	BootConfigAndPackage2Part4 = 24,
+	BootConfigAndPackage2Part5 = 25,
+	BootConfigAndPackage2Part6 = 26,
+	CalibrationBinary = 27,
+	CalibrationFile = 28,
+	SafeMode = 29,
+	SystemProperEncryption = 30,
+	User = 31,
+};
+
+enum fssrv::DirectoryEntryType : u8 {
+	Directory = 0,
+	File = 1,
+};
+
+enum fssrv::FileSystemType : u32 {
+	Invalid = 0,
+	Invalid2 = 1,
+	Logo = 2,
+	ContentControl = 3,
+	ContentManual = 4,
+	ContentMeta = 5,
+	ContentData = 6,
+	ApplicationPackage = 7,
+};
+
+interface fssrv::IFileSystemProxy is "fsp-srv" {
+    [18] OpenSdCardFileSystem(
+        sf::Out<sf::SharedPointer<fssrv::IFileSystem>> out
+    );
+}
+
+interface fssrv::IFileSystem {
+
+}

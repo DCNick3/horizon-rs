@@ -17,15 +17,14 @@ impl IUserInterface {
     fn initialize() -> Result<()> {
         todo!("Command codegen")
     }
-    fn get_service(name: ServiceName, session_handle: &mut RawHandle) -> Result<()> {
+    fn get_service(name: ServiceName) -> Result<RawHandle> {
         todo!("Command codegen")
     }
     fn register_service(
         name: ServiceName,
         max_sessions: u32,
         is_light: bool,
-        port_handle: &mut RawHandle,
-    ) -> Result<()> {
+    ) -> Result<RawHandle> {
         todo!("Command codegen")
     }
     fn unregister_service(name: ServiceName) -> Result<()> {

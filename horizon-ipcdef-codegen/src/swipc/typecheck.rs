@@ -224,7 +224,7 @@ impl Interface {
             res.extend_result(
                 command
                     .typecheck(context)
-                    .with_context(self.location, || format!("In command `{}`", self.name)),
+                    .with_context(self.location, || format!("In interface `{}`", self.name)),
             );
 
             match command_names.entry(&command.name) {

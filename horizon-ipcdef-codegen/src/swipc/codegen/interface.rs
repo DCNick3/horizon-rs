@@ -1,10 +1,14 @@
 use crate::swipc::codegen::types::make_nominal_type;
-use crate::swipc::codegen::{make_ident, TokenStorage};
-use crate::swipc::model::{CodegenContext, Command, Interface, Namespace, Value};
+use crate::swipc::codegen::{import_in, make_ident, TokenStorage};
+use crate::swipc::model::{CodegenContext, Command, Interface, Namespace, NamespacedIdent, Value};
 use arcstr::ArcStr;
 use convert_case::{Case, Casing};
 use genco::lang::rust::Tokens;
 use genco::prelude::*;
+
+fn make_interface_reference(current_namespace: &Namespace, name: &NamespacedIdent) -> Tokens {
+    import_in(current_namespace, name)
+}
 
 fn make_session_handle_ref() -> Tokens {
     let imp = rust::import("horizon_ipc::cmif", "SessionHandleRef");
@@ -32,6 +36,7 @@ fn make_raw_handle() -> Tokens {
 
 fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext, c: &Command) {
     let mut args = Vec::new();
+    let mut results = Vec::new();
 
     let mut should_pass_pid = false;
 
@@ -40,9 +45,8 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
             .as_ref()
             .cloned()
             .unwrap_or_else(|| ArcStr::from(format!("unnamed_{}", args.len() + 1)));
-        let name = name.as_str();
 
-        let tok: Tokens = match arg.as_ref() {
+        match arg.as_ref() {
             Value::ClientProcessId => {
                 should_pass_pid = true;
                 continue;
@@ -51,35 +55,51 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
                 // pass In values by value
                 let ty = make_nominal_type(namespace, ty);
 
-                // This roundabout way of returning value is for CLion to be happy
-                let t: Tokens = quote! {
-                    $name: $ty
-                };
-                t
+                args.push((
+                    name,
+                    quote! {
+                        $ty
+                    },
+                ));
             }
             Value::Out(ty) => {
                 // pass Out values by mutable reference (the impl will write the result back)
                 // an unfortunate consequence is that the value should be initialized before the call =(
                 // ignore for now, but kinda an important part of an API
                 let ty = make_nominal_type(namespace, ty);
-                quote! {
-                    $name: &mut $ty
-                }
+                results.push((
+                    name,
+                    quote! {
+                        $ty
+                    },
+                ));
             }
             Value::InObject(_, _) => {
                 todo!()
             }
-            Value::OutObject(_, _) => {
-                todo!()
+            Value::OutObject(interface_name, _) => {
+                if let Some(interface_name) = interface_name {
+                    results.push((
+                        name,
+                        quote! {
+                            $(make_interface_reference(namespace, interface_name))
+                        },
+                    ))
+                } else {
+                    todo!("Handling return of unknown object type")
+                }
             }
             Value::InHandle(_) => {
                 todo!()
             }
             Value::OutHandle(_) => {
                 // we just emit a RawHandle out param no matter what
-                quote! {
-                    $name: &mut $(make_raw_handle())
-                }
+                results.push((
+                    name,
+                    quote! {
+                        $(make_raw_handle())
+                    },
+                ));
             }
             Value::InArray(_, _) => {
                 todo!()
@@ -94,16 +114,25 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
                 todo!()
             }
         };
-
-        args.push(tok);
     }
+
+    let return_type = if let [(_, res)] = results.as_slice() {
+        quote!($res) as Tokens
+    } else {
+        // TODO: doing this we lose names. This is not __that__ bad, but kinda meh...
+        quote! {
+            (
+                $(for (_, ty) in results.iter() join (,) => $ty)
+            )
+        }
+    };
 
     // we expect command names in PascalCase, but convert them to snake_case when converting to rust
     let name = c.name.to_case(Case::Snake);
     quote_in! { *tok =>
         fn $name(
-            $(for arg in args join (,) => $arg)
-        ) -> $(make_result())<()> {
+            $(for (name, ty) in args join (,) => $(name.as_str()): $ty)
+        ) -> $(make_result())<$return_type> {
             todo!("Command codegen")
         }
     }

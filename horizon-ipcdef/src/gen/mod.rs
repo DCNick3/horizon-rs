@@ -1,2 +1,4 @@
-#![allow(dead_code, clippy::all)]
+#![allow(clippy::all)]
+mod account;
+mod fssrv;
 mod sm;
