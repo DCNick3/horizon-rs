@@ -1,3 +1,4 @@
+use crate::swipc::codegen::interface::gen_interface;
 use crate::swipc::codegen::types::{gen_bitflags, gen_enum, gen_struct, gen_type_alias};
 use crate::swipc::model::{CodegenContext, IpcFile, IpcFileItem, Namespace, NamespacedIdent};
 use anyhow::Context;
@@ -12,6 +13,7 @@ use sequence_trie::SequenceTrie;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+pub mod interface;
 pub mod types;
 
 type Item = genco::tokens::Item<Rust>;
@@ -181,9 +183,7 @@ fn gen_ipc_file(tok: &mut TokenStorage, ctx: &CodegenContext, f: &IpcFile) {
             IpcFileItem::StructDef(s) => gen_struct(tok, ctx, s),
             IpcFileItem::EnumDef(e) => gen_enum(tok, ctx, e),
             IpcFileItem::BitflagsDef(b) => gen_bitflags(tok, ctx, b),
-            IpcFileItem::InterfaceDef(_) => {
-                todo!("Interface codegen")
-            }
+            IpcFileItem::InterfaceDef(i) => gen_interface(tok, ctx, i),
         }
     }
 }

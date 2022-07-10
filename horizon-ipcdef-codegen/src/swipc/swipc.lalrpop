@@ -262,6 +262,7 @@ pub InterfaceDef: Interface =
     "}"
     <r:@R> => Interface {
         name,
+        is_domain: false, // TODO: add syntax for this
         sm_names: sm_names.unwrap_or_default(),
         commands,
         location: Span::new(file_id, l, r),

@@ -480,6 +480,8 @@ pub struct Command {
 #[derivative(PartialEq)]
 pub struct Interface {
     pub name: NamespacedIdent,
+    /// Whether the code generated should be using domain objects or not
+    pub is_domain: bool,
     pub sm_names: Vec<ArcStr>,
     pub commands: Vec<Command>,
     #[derivative(PartialEq = "ignore")]
