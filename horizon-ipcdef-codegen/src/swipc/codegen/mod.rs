@@ -78,7 +78,7 @@ fn import_in(current_namespace: &Namespace, import_item: &NamespacedIdent) -> To
     }
 }
 
-fn filename_for_namespace(namespace: &Namespace) -> String {
+fn filename_for_namespace(namespace: &Namespace, is_directory: bool) -> String {
     let mut r = String::new();
 
     for part in namespace.iter() {
@@ -86,7 +86,12 @@ fn filename_for_namespace(namespace: &Namespace) -> String {
         r.push('/');
     }
 
-    r.push_str("mod.rs");
+    if is_directory {
+        r.push_str("mod.rs");
+    } else {
+        r.pop();
+        r.push_str(".rs");
+    }
 
     r
 }
@@ -148,14 +153,15 @@ impl TokenStorage {
                     .collect::<Vec<_>>();
 
                 let tok = quote! {
-                    $(for module in child_modules {
+                    $(for module in child_modules.iter() {
                         mod $(module.as_str());
                     })
 
                     $tok
                 };
 
-                let name = filename_for_namespace(&ns);
+                let should_be_directory_module = !child_modules.is_empty();
+                let name = filename_for_namespace(&ns, should_be_directory_module);
 
                 let mut w = genco::fmt::FmtWriter::new(String::new());
                 let fmt =
