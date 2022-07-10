@@ -606,7 +606,14 @@ impl TypecheckedIpcFile {
         let mut named_types = BTreeMap::new();
         let mut interfaces = BTreeMap::new();
 
-        let res = RefCell::new(Ok(()));
+        let mut res = Ok(());
+
+        // check naming
+        for item in items.iter() {
+            res.extend_result(item.check_naming());
+        }
+
+        let res = RefCell::new(res);
 
         let mut try_add_named_type = |ty: TypeWithName| {
             let name = ty.name().clone();
@@ -648,6 +655,7 @@ impl TypecheckedIpcFile {
                 ),
             };
 
+        // add types into typecheck context, check there are no duplicates
         for item in items.iter() {
             match item {
                 IpcFileItem::TypeAlias(alias) => {

@@ -216,15 +216,15 @@ mod tests {
     #[test]
     fn multifile() {
         let s = r#"
-            struct ns1::Struct1 {
-                ns2::Enum1 test;
+            struct ns_1::Struct1 {
+                ns_2::Enum1 test;
             };
-            enum ns2::Enum1 : u32 {
+            enum ns_2::Enum1 : u32 {
                 Arm1 = 1,
                 Arm2 = 2,
             };
-            type ns3::HelloAlias = ns1::Struct1;
-            type ns3::nested::HelloAlias2 = ns3::HelloAlias;
+            type ns_3::HelloAlias = ns_1::Struct1;
+            type ns_3::nested::HelloAlias2 = ns_3::HelloAlias;
         "#;
 
         let file: TypecheckedIpcFile = unwrap_parse(s, parse_typechecked_ipc_file);
@@ -245,15 +245,15 @@ mod tests {
                 "mod.rs",
                 indoc! {"
                     #![allow(clippy::all)]
-                    mod ns1;
-                    mod ns2;
-                    mod ns3;
+                    mod ns_1;
+                    mod ns_2;
+                    mod ns_3;
                 "},
             ),
             (
-                "ns1/mod.rs",
+                "ns_1/mod.rs",
                 indoc! {"
-                    use super::ns2::Enum1;
+                    use super::ns_2::Enum1;
                     #[repr(C)]
                     pub struct Struct1 {
                         pub test: Enum1,
@@ -266,7 +266,7 @@ mod tests {
                 "},
             ),
             (
-                "ns2/mod.rs",
+                "ns_2/mod.rs",
                 indoc! {"
                     #[repr(u32)]
                     pub enum Enum1 {
@@ -276,15 +276,15 @@ mod tests {
                 "},
             ),
             (
-                "ns3/mod.rs",
+                "ns_3/mod.rs",
                 indoc! {"
-                    use super::ns1::Struct1;
+                    use super::ns_1::Struct1;
                     mod nested;
                     pub type HelloAlias = Struct1;
                 "},
             ),
             (
-                "ns3/nested/mod.rs",
+                "ns_3/nested/mod.rs",
                 indoc! {"
                     use super::HelloAlias;
                     pub type HelloAlias2 = HelloAlias;

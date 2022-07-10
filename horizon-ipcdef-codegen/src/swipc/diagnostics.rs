@@ -1,4 +1,4 @@
-use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 use codespan_reporting::files::SimpleFiles;
 use itertools::Either;
 use lalrpop_util::lexer::Token;
@@ -58,6 +58,10 @@ pub fn diagnostics_from_parse_error<'source>(
 
 pub type Error = Vec<Diagnostic<usize>>;
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub fn is_diags_fatal(diags: &Error) -> bool {
+    diags.iter().any(|diag| diag.severity >= Severity::Error)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Span {

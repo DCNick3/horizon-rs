@@ -258,25 +258,25 @@ interface sm::detail::IUserInterface is "sm:" {
     #[test]
     fn multiple_def_file() {
         let s = r#"
-type a = u8;
-type b = u8;
-type a = u8;
-struct c {};
-struct a {};
-struct b {};
-type c = a;
+type A = u8;
+type B = u8;
+type A = u8;
+struct C {};
+struct A {};
+struct B {};
+type C = A;
         "#;
         unwrap_err_parse(
             s,
             parse_typechecked_ipc_file,
-            "Multiple definitions of type `a`",
+            "Multiple definitions of type `A`",
         );
     }
 
     #[test]
     fn undef_alias_file() {
         let s = r#"
-type t = undefined_type;
+type T = undefined_type;
         "#;
         unwrap_err_parse(
             s,
@@ -288,7 +288,7 @@ type t = undefined_type;
     #[test]
     fn undef_struct_file() {
         let s = r#"
-struct s {
+struct S {
     undefined_type value;
 };
         "#;
@@ -302,7 +302,7 @@ struct s {
     #[test]
     fn unsized_struct_file() {
         let s = r#"
-struct test {
+struct Test {
     sf::Unknown<1> sized_value;
     sf::Unknown  unsized_value;
 };
@@ -317,28 +317,28 @@ struct test {
     #[test]
     fn enum_overflow_file() {
         let s = r#"
-enum test : u8 {
-    ok1 = 1,
-    large = 256,
-    ok2 = 2,
+enum Test : u8 {
+    Ok1 = 1,
+    Large = 256,
+    Ok2 = 2,
 };
         "#;
         unwrap_err_parse(
             s,
             parse_typechecked_ipc_file,
-            "Value 256 of enum arm `large` does not fit into type U8",
+            "Value 256 of enum arm `Large` does not fit into type U8",
         );
     }
 
     #[test]
     fn enum_duplicate_val_file() {
         let s = r#"
-enum test : u8 {
-    one_1 = 1,
-    one_2 = 1,
-    two_1 = 2,
-    one_3 = 1,
-    two_2 = 2,
+enum Test : u8 {
+    One1 = 1,
+    One2 = 1,
+    Two1 = 2,
+    One3 = 1,
+    Two2 = 2,
 };
         "#;
         unwrap_err_parse(s, parse_typechecked_ipc_file, "Duplicate enum value");
@@ -347,22 +347,22 @@ enum test : u8 {
     #[test]
     fn enum_duplicate_name_file() {
         let s = r#"
-enum test : u8 {
-    name = 1,
-    name = 2,
+enum Test : u8 {
+    Name = 1,
+    Name = 2,
 };
         "#;
         unwrap_err_parse(
             s,
             parse_typechecked_ipc_file,
-            "Duplicate enum arm named `name`",
+            "Duplicate enum arm named `Name`",
         );
     }
 
     #[test]
     fn struct_duplicate_file() {
         let s = r#"
-struct test {
+struct Test {
     u8 one;
     u16 one;
 };
@@ -377,31 +377,31 @@ struct test {
     #[test]
     fn bitflags_overflow_file() {
         let s = r#"
-bitflags test : u8 {
-    ok1 = 1,
-    large = 256,
-    ok2 = 1,
+bitflags Test : u8 {
+    Ok1 = 1,
+    Large = 256,
+    Ok2 = 1,
 };
         "#;
         unwrap_err_parse(
             s,
             parse_typechecked_ipc_file,
-            "Value 256 of bitflags arm `large` does not fit into type U8",
+            "Value 256 of bitflags arm `Large` does not fit into type U8",
         );
     }
 
     #[test]
     fn bitflags_duplicate_file() {
         let s = r#"
-bitflags test : u8 {
-    one = 1,
-    one = 2,
+bitflags Test : u8 {
+    One = 1,
+    One = 2,
 };
         "#;
         unwrap_err_parse(
             s,
             parse_typechecked_ipc_file,
-            "Duplicate bitfield arm named `one`",
+            "Duplicate bitfield arm named `One`",
         );
     }
 
@@ -488,6 +488,124 @@ struct HelloStruct {
 type HelloStructAlias = HelloStruct;
         "#;
         let file = unwrap_parse(s, parse_typechecked_ipc_file);
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn enum_naming() {
+        let s = r#"
+enum non_pascal_name : u8 {};
+        "#;
+        let file = unwrap_err_parse(s, parse_typechecked_ipc_file, "Enum name `non_pascal_name` should have the identifier in PascalCase, like `NonPascalName`");
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn enum_arm_naming() {
+        let s = r#"
+enum PascalName : u8 {
+    non_pascal_name = 1,
+};
+        "#;
+        let file = unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Enum arm name `non_pascal_name` should be in PascalCase, like `NonPascalName`",
+        );
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn type_alias_naming() {
+        let s = r#"
+type non_pascal_name = u8;
+        "#;
+        let file = unwrap_err_parse(s, parse_typechecked_ipc_file, "Type alias name `non_pascal_name` should have the identifier in PascalCase, like `NonPascalName`");
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn struct_naming() {
+        let s = r#"
+struct lol::non_pascal_name {};
+        "#;
+        let file = unwrap_err_parse(s, parse_typechecked_ipc_file, "Struct name `lol::non_pascal_name` should have the identifier in PascalCase, like `lol::NonPascalName`");
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn struct_field_naming() {
+        let s = r#"
+struct lol::PascalName {
+    u8 PascalName;
+};
+        "#;
+        let file = unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Struct field name `PascalName` should be in snake_case, like `pascal_name`",
+        );
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn interface_naming() {
+        let s = r#"
+interface non_pascal_name {}
+        "#;
+        let file = unwrap_err_parse(s, parse_typechecked_ipc_file, "Interface name `non_pascal_name` should have the identifier in PascalCase, like `NonPascalName`");
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn interface_namespace_naming() {
+        let s = r#"
+interface Kek::PascalName {}
+        "#;
+        let file = unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Interface name `Kek::PascalName` should have namespaces in camel_case, like `kek::PascalName`",
+        );
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn command_naming() {
+        let s = r#"
+interface PascalName {
+    [0] non_pascal_name();
+}
+        "#;
+        let file = unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Command name `non_pascal_name` should be in PascalCase, like `NonPascalName`",
+        );
+
+        println!("{:#?}", file);
+    }
+
+    #[test]
+    fn command_argument_naming() {
+        let s = r#"
+interface PascalName {
+    [0] PascalName(u8 PascalName);
+}
+        "#;
+        let file = unwrap_err_parse(
+            s,
+            parse_typechecked_ipc_file,
+            "Argument name `PascalName` should be in snake_case, like `pascal_name`",
+        );
 
         println!("{:#?}", file);
     }

@@ -300,6 +300,9 @@ pub fn run(args: Args) -> anyhow::Result<()> {
                 Err(diags) => {
                     display_diagnostics(&source_files, diags);
 
+                    // TODO: do not fail if we only have warnings
+                    // this mandates some changes to the diagnostics types...
+                    // Maybe add a DiagResult that has Result and Diagnostics attached?
                     return Err(anyhow!("Compilation failed"));
                 }
             };

@@ -149,7 +149,7 @@ mod tests {
         let s = r#"
             interface IHelloInterface {
                 [0] HelloCommand();
-                [1] HelloCommand1(u8 input1, sf::Out<u32>, u16 input2, sf::Out<sf::Bytes<0x20>> output2);
+                [1] HelloCommand1(u8 input_1, sf::Out<u32>, u16 input_2, sf::Out<sf::Bytes<0x20>> output_2);
             }
         "#;
 
@@ -189,10 +189,10 @@ mod tests {
                         todo!("Command codegen")
                     }
                     fn HelloCommand1(
-                        input1: u8,
+                        input_1: u8,
                         unnamed_2: &mut u32,
-                        input2: u16,
-                        output2: &mut [u8; 32],
+                        input_2: u16,
+                        output_2: &mut [u8; 32],
                     ) -> Result<()> {
                         todo!("Command codegen")
                     }
