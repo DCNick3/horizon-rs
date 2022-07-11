@@ -1,6 +1,9 @@
 use crate::swipc::codegen::types::make_nominal_type;
 use crate::swipc::codegen::{import_in, make_ident, TokenStorage};
-use crate::swipc::model::{CodegenContext, Command, Interface, Namespace, NamespacedIdent, Value};
+use crate::swipc::model::{
+    BufferExtraAttrs, BufferTransferMode, CodegenContext, Command, Direction, HandleTransferType,
+    IntType, Interface, Namespace, NamespacedIdent, NominalType, StructuralType, Value,
+};
 use arcstr::ArcStr;
 use convert_case::{Case, Casing};
 use genco::lang::rust::Tokens;
@@ -34,9 +37,85 @@ fn make_raw_handle() -> Tokens {
     quote!($imp)
 }
 
-fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext, c: &Command) {
+fn make_maybe_uninit() -> Tokens {
+    let imp = rust::import("core::mem", "MaybeUninit");
+
+    quote!($imp)
+}
+
+enum BufferSource {
+    /// We have a byte slice in scope that should be converted to a buffer
+    ByteSlice(ArcStr),
+    /// We have a local variable of type MaybeUninit<some IPC type> that should have reference taken and converted to a buffer
+    TypedUninitVariable(ArcStr),
+    /// We have a reference to some IPC type in scope that should be converted to a buffer
+    TypedReference(ArcStr),
+    /// We have a slice of an IPC type in scope that should be converted to a buffer
+    TypedSlice(ArcStr),
+}
+
+struct Buffer {
+    source: BufferSource,
+    direction: Direction,
+    transfer_mode: BufferTransferMode,
+    fixed_size: bool,
+    extra_attrs: BufferExtraAttrs,
+}
+
+enum RawDataInSource {
+    Local,
+    PidPlaceholder,
+}
+
+struct RawDataIn {
+    name: ArcStr,
+    source: RawDataInSource,
+    ty: NominalType,
+}
+
+struct RawDataOut {
+    name: ArcStr,
+    ty: NominalType,
+}
+
+struct HandleIn {
+    name: ArcStr,
+    transfer_type: HandleTransferType,
+}
+
+struct HandleOut {
+    name: ArcStr,
+    transfer_type: HandleTransferType,
+    transform: HandleTransformType,
+}
+
+enum HandleTransformType {
+    RawValue,
+    Interface(NamespacedIdent),
+}
+
+fn make_raw_data_struct(
+    namespace: &Namespace,
+    items: impl Iterator<Item = (&ArcStr, &NominalType)>,
+) {
+}
+
+fn gen_command_in(
+    namespace: &Namespace,
+    tok: &mut Tokens,
+    ctx: &CodegenContext,
+    c: &Command,
+    is_domain: bool,
+) {
     let mut args = Vec::new();
     let mut results = Vec::new();
+    let mut uninit_vars = Vec::new();
+
+    let mut buffers = Vec::new();
+    let mut raw_data_in = Vec::new();
+    let mut raw_data_out = Vec::new();
+    let mut handles_in = Vec::new();
+    let mut handles_out = Vec::new();
 
     let mut should_pass_pid = false;
 
@@ -49,36 +128,88 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
         match arg.as_ref() {
             Value::ClientProcessId => {
                 should_pass_pid = true;
+                raw_data_in.push(RawDataIn {
+                    name: arcstr::literal!("_pid_placeholder"),
+                    source: RawDataInSource::PidPlaceholder,
+                    ty: NominalType::Int(IntType::U64),
+                });
                 continue;
             }
             Value::In(ty) => {
+                let struct_ty = ty.codegen_resolve(ctx);
+                let is_large_data = struct_ty.is_large_data();
+
+                if is_large_data {
+                    buffers.push(Buffer {
+                        source: BufferSource::TypedReference(name.clone()),
+                        direction: Direction::In,
+                        transfer_mode: struct_ty.preferred_transfer_mode(),
+                        extra_attrs: BufferExtraAttrs::None,
+                        fixed_size: true,
+                    });
+                } else {
+                    raw_data_in.push(RawDataIn {
+                        name: name.clone(),
+                        source: RawDataInSource::Local,
+                        ty: ty.clone(),
+                    })
+                }
+
                 // pass In values by value
-                let ty = make_nominal_type(namespace, ty);
+                let ty_tok = make_nominal_type(namespace, ty);
 
                 args.push((
                     name,
                     quote! {
-                        $ty
+                        $(if is_large_data { &$ty_tok } else { $ty_tok } )
                     },
                 ));
             }
             Value::Out(ty) => {
-                // pass Out values by mutable reference (the impl will write the result back)
-                // an unfortunate consequence is that the value should be initialized before the call =(
-                // ignore for now, but kinda an important part of an API
-                let ty = make_nominal_type(namespace, ty);
+                let struct_ty = ty.codegen_resolve(ctx);
+                let is_large_data = struct_ty.is_large_data();
+
+                let ty_tok = make_nominal_type(namespace, ty);
+                let ty_tok = &ty_tok;
+
+                if is_large_data {
+                    uninit_vars.push((name.clone(), quote!($ty_tok)));
+                    buffers.push(Buffer {
+                        source: BufferSource::TypedReference(name.clone()),
+                        direction: Direction::Out,
+                        transfer_mode: struct_ty.preferred_transfer_mode(),
+                        extra_attrs: BufferExtraAttrs::None,
+                        fixed_size: true,
+                    });
+                } else {
+                    raw_data_out.push(RawDataOut {
+                        name: name.clone(),
+                        ty: ty.clone(),
+                    })
+                }
                 results.push((
                     name,
                     quote! {
-                        $ty
+                        $ty_tok
                     },
                 ));
             }
             Value::InObject(_, _) => {
+                assert!(is_domain, "Input objects supported only in domain requests");
                 todo!()
             }
             Value::OutObject(interface_name, _) => {
+                if is_domain {
+                    todo!("Domain not implemented")
+                }
+
                 if let Some(interface_name) = interface_name {
+                    handles_out.push(HandleOut {
+                        name: name.clone(),
+                        transfer_type: HandleTransferType::Copy,
+                        transform: HandleTransformType::Interface(interface_name.clone()),
+                    });
+
                     results.push((
                         name,
                         quote! {
@@ -89,11 +220,28 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
                     todo!("Handling return of unknown object type")
                 }
             }
-            Value::InHandle(_) => {
-                todo!()
+            &Value::InHandle(transfer_type) => {
+                // TODO: we probably want to distinguish between Move and Copy handles here
+                // by taking in owning or referencing handle types
+                handles_in.push(HandleIn {
+                    name: name.clone(),
+                    transfer_type,
+                });
+
+                args.push((
+                    name,
+                    quote! {
+                        $(make_raw_handle())
+                    },
+                ));
             }
-            Value::OutHandle(_) => {
-                // we just emit a RawHandle out param no matter what
+            &Value::OutHandle(transfer_type) => {
+                handles_out.push(HandleOut {
+                    name: name.clone(),
+                    transfer_type,
+                    transform: HandleTransformType::RawValue,
+                });
+
                 results.push((
                     name,
                     quote! {
@@ -101,20 +249,87 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
                     },
                 ));
             }
-            Value::InArray(_, _) => {
-                todo!()
+            Value::InArray(ty, transfer_mode) => {
+                let struct_ty = ty.codegen_resolve(ctx);
+
+                buffers.push(Buffer {
+                    source: BufferSource::TypedSlice(name.clone()),
+                    direction: Direction::In,
+                    transfer_mode: transfer_mode
+                        .unwrap_or_else(|| struct_ty.preferred_transfer_mode()),
+                    fixed_size: struct_ty.is_large_data(),
+                    extra_attrs: BufferExtraAttrs::None,
+                });
+
+                args.push((
+                    name,
+                    quote! {
+                        &[$(make_nominal_type(namespace, ty))]
+                    },
+                ));
             }
-            Value::OutArray(_, _) => {
-                todo!()
+            Value::OutArray(ty, transfer_mode) => {
+                let struct_ty = ty.codegen_resolve(ctx);
+
+                buffers.push(Buffer {
+                    source: BufferSource::TypedSlice(name.clone()),
+                    direction: Direction::Out,
+                    transfer_mode: transfer_mode
+                        .unwrap_or_else(|| struct_ty.preferred_transfer_mode()),
+                    fixed_size: struct_ty.is_large_data(),
+                    extra_attrs: BufferExtraAttrs::None,
+                });
+
+                args.push((
+                    name,
+                    quote! {
+                        &mut [$(make_nominal_type(namespace, ty))]
+                    },
+                ));
             }
-            Value::InBuffer(_, _) => {
-                todo!()
+            &Value::InBuffer(transfer_mode, extra_attrs) => {
+                buffers.push(Buffer {
+                    source: BufferSource::ByteSlice(name.clone()),
+                    direction: Direction::In,
+                    transfer_mode,
+                    fixed_size: false,
+                    extra_attrs,
+                });
+
+                args.push((
+                    name,
+                    quote! {
+                        &[u8]
+                    },
+                ));
             }
-            Value::OutBuffer(_, _) => {
-                todo!()
+            &Value::OutBuffer(transfer_mode, extra_attrs) => {
+                buffers.push(Buffer {
+                    source: BufferSource::ByteSlice(name.clone()),
+                    direction: Direction::Out,
+                    transfer_mode,
+                    fixed_size: false,
+                    extra_attrs,
+                });
+
+                args.push((
+                    name,
+                    quote! {
+                        &mut [u8]
+                    },
+                ));
             }
         };
     }
+
+    // sort raw data by alignment, because.... This is ABI
+    // they tried to make an optimal packing, but this is suboptimal, lol
+    raw_data_in.sort_by_cached_key(|d| d.ty.layout(&ctx).alignment());
+    raw_data_out.sort_by_cached_key(|d| d.ty.layout(&ctx).alignment());
+
+    assert!(buffers.len() <= 8, "Methods must take in <= 8 Buffers");
+    assert!(handles_in.len() <= 8, "Methods must take in <= 8 Handles");
+    assert!(handles_out.len() <= 8, "Methods must output <= 8 Handles");
 
     let return_type = if let [(_, res)] = results.as_slice() {
         quote!($res) as Tokens
@@ -133,6 +348,10 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
         pub fn $name(
             $(for (name, ty) in args join (,) => $(name.as_str()): $ty)
         ) -> $(make_result())<$return_type> {
+            $(for (name, ty) in uninit_vars {
+                let $(name.as_str()) = $(make_maybe_uninit())::<$ty>::uninit();
+            })
+
             todo!("Command codegen")
         }
     }
@@ -149,7 +368,7 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
 
     let mut commands_impl = Tokens::new();
     for command in i.commands.iter() {
-        gen_command_in(namespace, &mut commands_impl, ctx, command);
+        gen_command_in(namespace, &mut commands_impl, ctx, command, i.is_domain);
     }
 
     tok.push(

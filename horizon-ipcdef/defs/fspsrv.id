@@ -107,6 +107,70 @@ interface fssrv::IFileSystemProxy is "fsp-srv" {
     );
 }
 
+struct fssrv::CodeVerificationData : sf::LargeData {
+    sf::Bytes<256> signature;
+    sf::Bytes<32>  target_hash;
+    b8             has_data;
+    sf::Bytes<3>   reserved;
+};
+
+interface fssrv::IFileSystemProxyForLoader is "fsp-ldr" {
+    [0] OpenCodeFileSystem(
+        sf::Out<sf::SharedPointer<fssrv::IFileSystem>> out_fs,
+        sf::Out<fssrv::CodeVerificationData> out_verif,
+        fssrv::Path path,
+        ncm::ProgramId program_id
+    );
+    [1] IsArchivedProgram(sf::Out<b8> out, u64 process_id);
+    [2] SetCurrentProcess(sf::ClientProcessId client_pid);
+}
+
+struct fssrv::Path : sf::LargeData {
+    sf::Bytes<0x301> str;
+};
+
+struct fssrv::FileTimeStampRaw {
+    i64 create;
+    i64 modify;
+    i64 access;
+    b8 is_local_time;
+    sf::Bytes<7> pad;
+};
+
+bitflags fssrv::CreateOption : u32 {
+    BigFile = 0x1,
+};
+
+enum fssrv::QueryId : u32 {
+    SetConcatenationFileAttribute = 0,
+    UpdateMac = 1,
+    IsSignedSystemPartitionOnSdCardValid = 2,
+    QueryUnpreparedFileInformation = 3,
+};
+
 interface fssrv::IFileSystem {
+    [0] CreateFile(fssrv::Path path, i64 size, fssrv::CreateOption option);
+    [1] DeleteFile(fssrv::Path path);
+    [2] CreateDirectory(fssrv::Path path);
+    [3] DeleteDirectory(fssrv::Path path);
+    [4] DeleteDirectoryRecursively(fssrv::Path path);
+    [5] RenameFile(fssrv::Path old_path, fssrv::Path new_path);
+    [6] RenameDirectory(fssrv::Path old_path, fssrv::Path new_path);
+    [7] GetEntryType(sf::Out<u32> out, fssrv::Path path);
+    [8] OpenFile(sf::Out<sf::SharedPointer<fssrv::IFile>> out, fssrv::Path path, u32 mode);
+    [9] OpenDirectory(sf::Out<sf::SharedPointer<fssrv::IDirectory>> out, fssrv::Path path, u32 mode);
+    [10] Commit();
+    [11] GetFreeSpaceSize(sf::Out<i64> out, fssrv::Path path);
+    [12] GetTotalSpaceSize(sf::Out<i64> out, fssrv::Path path);
+    [13] CleanDirectoryRecursively(fssrv::Path path);
+    [14] GetFileTimeStampRaw(sf::Out<fssrv::FileTimeStampRaw>, fssrv::Path path);
+    [15] QueryEntry(sf::OutNonSecureBuffer out_buf, sf::InNonSecureBuffer in_buf, fssrv::QueryId query_id, fssrv::Path path);
+}
+
+interface fssrv::IFile {
+
+}
+
+interface fssrv::IDirectory {
 
 }

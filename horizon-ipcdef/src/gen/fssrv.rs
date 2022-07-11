@@ -1,6 +1,9 @@
+use bitflags::bitflags;
+use core::mem::MaybeUninit;
 use horizon_error::Result;
 use horizon_ipc::cmif::SessionHandle;
 use super::account::Uid;
+use super::ncm::ProgramId;
 #[repr(C)]
 pub struct FsSaveDataCreationInfo {
     pub save_data_size: i64,
@@ -89,7 +92,133 @@ impl IFileSystemProxy {
         todo!("Command codegen")
     }
 }
+/// This struct is marked with sf::LargeData
+#[repr(C)]
+pub struct CodeVerificationData {
+    pub signature: [u8; 256],
+    pub target_hash: [u8; 32],
+    pub has_data: bool,
+    pub reserved: [u8; 3],
+}
+// Static size check for CodeVerificationData (expect 292 bytes)
+const _: fn() = || {
+    let _ = ::core::mem::transmute::<CodeVerificationData, [u8; 292]>;
+};
+
+pub struct IFileSystemProxyForLoader {
+    handle: SessionHandle,
+}
+impl IFileSystemProxyForLoader {
+    pub fn open_code_file_system(
+        path: &Path,
+        program_id: ProgramId,
+    ) -> Result<(IFileSystem, CodeVerificationData)> {
+        let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
+        todo!("Command codegen")
+    }
+    pub fn is_archived_program(process_id: u64) -> Result<bool> {
+        todo!("Command codegen")
+    }
+    pub fn set_current_process() -> Result<()> {
+        todo!("Command codegen")
+    }
+}
+/// This struct is marked with sf::LargeData
+#[repr(C)]
+pub struct Path {
+    pub str: [u8; 769],
+}
+// Static size check for Path (expect 769 bytes)
+const _: fn() = || {
+    let _ = ::core::mem::transmute::<Path, [u8; 769]>;
+};
+
+#[repr(C)]
+pub struct FileTimeStampRaw {
+    pub create: i64,
+    pub modify: i64,
+    pub access: i64,
+    pub is_local_time: bool,
+    pub pad: [u8; 7],
+}
+// Static size check for FileTimeStampRaw (expect 32 bytes)
+const _: fn() = || {
+    let _ = ::core::mem::transmute::<FileTimeStampRaw, [u8; 32]>;
+};
+
+bitflags! {
+    pub struct CreateOption : u32 { const BigFile = 0x1; }
+}
+#[repr(u32)]
+pub enum QueryId {
+    SetConcatenationFileAttribute = 0,
+    UpdateMac = 1,
+    IsSignedSystemPartitionOnSdCardValid = 2,
+    QueryUnpreparedFileInformation = 3,
+}
 pub struct IFileSystem {
     handle: SessionHandle,
 }
-impl IFileSystem {}
+impl IFileSystem {
+    pub fn create_file(path: &Path, size: i64, option: CreateOption) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn delete_file(path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn create_directory(path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn delete_directory(path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn delete_directory_recursively(path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn rename_file(old_path: &Path, new_path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn rename_directory(old_path: &Path, new_path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn get_entry_type(path: &Path) -> Result<u32> {
+        todo!("Command codegen")
+    }
+    pub fn open_file(path: &Path, mode: u32) -> Result<IFile> {
+        todo!("Command codegen")
+    }
+    pub fn open_directory(path: &Path, mode: u32) -> Result<IDirectory> {
+        todo!("Command codegen")
+    }
+    pub fn commit() -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn get_free_space_size(path: &Path) -> Result<i64> {
+        todo!("Command codegen")
+    }
+    pub fn get_total_space_size(path: &Path) -> Result<i64> {
+        todo!("Command codegen")
+    }
+    pub fn clean_directory_recursively(path: &Path) -> Result<()> {
+        todo!("Command codegen")
+    }
+    pub fn get_file_time_stamp_raw(path: &Path) -> Result<FileTimeStampRaw> {
+        todo!("Command codegen")
+    }
+    pub fn query_entry(
+        out_buf: &mut [u8],
+        in_buf: &[u8],
+        query_id: QueryId,
+        path: &Path,
+    ) -> Result<()> {
+        todo!("Command codegen")
+    }
+}
+pub struct IFile {
+    handle: SessionHandle,
+}
+impl IFile {}
+pub struct IDirectory {
+    handle: SessionHandle,
+}
+impl IDirectory {}

@@ -198,24 +198,38 @@ impl StructuralType {
     }
 
     pub fn preferred_transfer_mode(&self) -> BufferTransferMode {
-        todo!()
+        match self {
+            StructuralType::Struct(s) => s.preferred_transfer_mode.unwrap_or(if s.is_large_data {
+                BufferTransferMode::Pointer
+            } else {
+                BufferTransferMode::MapAlias
+            }),
+            _ => BufferTransferMode::MapAlias,
+        }
+    }
+
+    pub fn is_large_data(&self) -> bool {
+        match self {
+            StructuralType::Struct(s) => s.is_large_data,
+            _ => false,
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum HandleTransferType {
     Move,
     Copy,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BufferTransferMode {
     MapAlias,
     Pointer,
     AutoSelect,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BufferExtraAttrs {
     None,
     AllowNonSecure,
