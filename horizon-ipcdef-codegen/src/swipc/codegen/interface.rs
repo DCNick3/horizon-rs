@@ -130,7 +130,7 @@ fn gen_command_in(namespace: &Namespace, tok: &mut Tokens, ctx: &CodegenContext,
     // we expect command names in PascalCase, but convert them to snake_case when converting to rust
     let name = c.name.to_case(Case::Snake);
     quote_in! { *tok =>
-        fn $name(
+        pub fn $name(
             $(for (name, ty) in args join (,) => $(name.as_str()): $ty)
         ) -> $(make_result())<$return_type> {
             todo!("Command codegen")

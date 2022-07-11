@@ -85,7 +85,7 @@ pub struct IFileSystemProxy {
     handle: SessionHandle,
 }
 impl IFileSystemProxy {
-    fn open_sd_card_file_system() -> Result<IFileSystem> {
+    pub fn open_sd_card_file_system() -> Result<IFileSystem> {
         todo!("Command codegen")
     }
 }
