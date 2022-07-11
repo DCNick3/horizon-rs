@@ -163,7 +163,7 @@ interface fssrv::IFileSystem {
     [11] GetFreeSpaceSize(sf::Out<i64> out, fssrv::Path path);
     [12] GetTotalSpaceSize(sf::Out<i64> out, fssrv::Path path);
     [13] CleanDirectoryRecursively(fssrv::Path path);
-    [14] GetFileTimeStampRaw(sf::Out<fssrv::FileTimeStampRaw>, fssrv::Path path);
+    [14] GetFileTimeStampRaw(sf::Out<fssrv::FileTimeStampRaw> out, fssrv::Path path);
     [15] QueryEntry(sf::OutNonSecureBuffer out_buf, sf::InNonSecureBuffer in_buf, fssrv::QueryId query_id, fssrv::Path path);
 }
 

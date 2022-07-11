@@ -590,6 +590,19 @@ pub struct CodegenContext {
     resolved_interfaces: BTreeMap<NamespacedIdent, Arc<Interface>>,
 }
 
+impl CodegenContext {
+    pub fn resolve_type(&self, nominal: &NominalType) -> StructuralType {
+        nominal.codegen_resolve(self)
+    }
+
+    pub fn resolve_interface(&self, name: &NamespacedIdent) -> Arc<Interface> {
+        self.resolved_interfaces
+            .get(name)
+            .expect("BUG: unresolved interface slipped past typecheck")
+            .clone()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct IpcFile {
     pub items: Vec<IpcFileItem>,

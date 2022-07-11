@@ -89,6 +89,7 @@ pub struct IFileSystemProxy {
 }
 impl IFileSystemProxy {
     pub fn open_sd_card_file_system() -> Result<IFileSystem> {
+        let data_in = ();
         todo!("Command codegen")
     }
 }
@@ -113,13 +114,21 @@ impl IFileSystemProxyForLoader {
         path: &Path,
         program_id: ProgramId,
     ) -> Result<(IFileSystem, CodeVerificationData)> {
+        let data_in = program_id;
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         todo!("Command codegen")
     }
     pub fn is_archived_program(process_id: u64) -> Result<bool> {
+        let data_in = process_id;
+        #[repr(C)]
+        struct Out {
+            out: bool,
+        }
+        let _ = ::core::mem::transmute::<Out, [u8; 1]>;
         todo!("Command codegen")
     }
     pub fn set_current_process() -> Result<()> {
+        let data_in = _pid_placeholder;
         todo!("Command codegen")
     }
 }
@@ -161,48 +170,89 @@ pub struct IFileSystem {
 }
 impl IFileSystem {
     pub fn create_file(path: &Path, size: i64, option: CreateOption) -> Result<()> {
+        #[repr(C)]
+        struct In {
+            option: CreateOption,
+            size: i64,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 16]>;
+        let data_in: In = In { option, size };
         todo!("Command codegen")
     }
     pub fn delete_file(path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn create_directory(path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn delete_directory(path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn delete_directory_recursively(path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn rename_file(old_path: &Path, new_path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn rename_directory(old_path: &Path, new_path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn get_entry_type(path: &Path) -> Result<u32> {
+        let data_in = ();
+        #[repr(C)]
+        struct Out {
+            out: u32,
+        }
+        let _ = ::core::mem::transmute::<Out, [u8; 4]>;
         todo!("Command codegen")
     }
     pub fn open_file(path: &Path, mode: u32) -> Result<IFile> {
+        let data_in = mode;
         todo!("Command codegen")
     }
     pub fn open_directory(path: &Path, mode: u32) -> Result<IDirectory> {
+        let data_in = mode;
         todo!("Command codegen")
     }
     pub fn commit() -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn get_free_space_size(path: &Path) -> Result<i64> {
+        let data_in = ();
+        #[repr(C)]
+        struct Out {
+            out: i64,
+        }
+        let _ = ::core::mem::transmute::<Out, [u8; 8]>;
         todo!("Command codegen")
     }
     pub fn get_total_space_size(path: &Path) -> Result<i64> {
+        let data_in = ();
+        #[repr(C)]
+        struct Out {
+            out: i64,
+        }
+        let _ = ::core::mem::transmute::<Out, [u8; 8]>;
         todo!("Command codegen")
     }
     pub fn clean_directory_recursively(path: &Path) -> Result<()> {
+        let data_in = ();
         todo!("Command codegen")
     }
     pub fn get_file_time_stamp_raw(path: &Path) -> Result<FileTimeStampRaw> {
+        let data_in = ();
+        #[repr(C)]
+        struct Out {
+            out: FileTimeStampRaw,
+        }
+        let _ = ::core::mem::transmute::<Out, [u8; 32]>;
         todo!("Command codegen")
     }
     pub fn query_entry(
@@ -211,6 +261,7 @@ impl IFileSystem {
         query_id: QueryId,
         path: &Path,
     ) -> Result<()> {
+        let data_in = query_id;
         todo!("Command codegen")
     }
 }

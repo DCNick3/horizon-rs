@@ -1,8 +1,9 @@
 use crate::swipc::codegen::types::make_nominal_type;
 use crate::swipc::codegen::{import_in, make_ident, TokenStorage};
+use crate::swipc::diagnostics::Span;
 use crate::swipc::model::{
     BufferExtraAttrs, BufferTransferMode, CodegenContext, Command, Direction, HandleTransferType,
-    IntType, Interface, Namespace, NamespacedIdent, NominalType, StructuralType, Value,
+    IntType, Interface, Namespace, NamespacedIdent, NominalType, Struct, StructField, Value,
 };
 use arcstr::ArcStr;
 use convert_case::{Case, Casing};
@@ -96,8 +97,75 @@ enum HandleTransformType {
 
 fn make_raw_data_struct(
     namespace: &Namespace,
-    items: impl Iterator<Item = (&ArcStr, &NominalType)>,
-) {
+    ctx: &CodegenContext,
+    direction: Direction,
+    items: impl Iterator<Item = (ArcStr, NominalType)>,
+) -> Tokens {
+    let name = NamespacedIdent::new(namespace.clone(), ArcStr::from(format!("{:?}", direction)));
+
+    let s = Struct::try_new(
+        name.clone(),
+        items
+            .map(|(name, ty)| StructField {
+                name,
+                ty,
+                location: Span::default(),
+            })
+            .collect(),
+        vec![],
+        Span::default(),
+    )
+    .unwrap();
+
+    let size = s.layout(ctx).size();
+
+    let name = name.ident().as_str();
+
+    quote! {
+        #[repr(C)]
+        struct $name {
+            $(for field in s.fields join (,) {
+                $(field.name.as_str()): $(make_nominal_type(namespace, &field.ty))
+            })
+        }
+
+        let _ = ::core::mem::transmute::<$name, [u8; $size]>;
+    }
+}
+
+fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawDataIn]) -> Tokens {
+    if data.is_empty() {
+        (quote! {
+            let data_in = ();
+        } as Tokens)
+    } else if let [data] = data {
+        quote! {
+            let data_in = $(data.name.as_str());
+        }
+    } else {
+        quote! {
+            $(make_raw_data_struct(
+                namespace,
+                ctx,
+                Direction::In,
+                data
+                    .iter()
+                    .map(|d| (d.name.clone(), d.ty.clone()))
+            ))
+
+            let data_in: In = In {
+                $(for data in data join (,) {
+                    $(match data.source {
+                        RawDataInSource::PidPlaceholder =>
+                            $(data.name.as_str()): 0,
+
+                        RawDataInSource::Local =>
+                            $(data.name.as_str()),
+                    })
+                })
+            };
+        }
+    }
 }
 
 fn gen_command_in(
@@ -136,7 +204,7 @@ fn gen_command_in(
                 continue;
             }
             Value::In(ty) => {
-                let struct_ty = ty.codegen_resolve(ctx);
+                let struct_ty = ctx.resolve_type(ty);
                 let is_large_data = struct_ty.is_large_data();
 
                 if is_large_data {
@@ -166,7 +234,7 @@ fn gen_command_in(
                 ));
             }
             Value::Out(ty) => {
-                let struct_ty = ty.codegen_resolve(ctx);
+                let struct_ty = ctx.resolve_type(ty);
                 let is_large_data = struct_ty.is_large_data();
 
                 let ty_tok = make_nominal_type(namespace, ty);
@@ -200,10 +268,16 @@ fn gen_command_in(
             }
             Value::OutObject(interface_name, _) => {
                 if is_domain {
-                    todo!("Domain not implemented")
+                    todo!("Domains not implemented")
                 }
 
                 if let Some(interface_name) = interface_name {
+                    let interface = ctx.resolve_interface(interface_name);
+
+                    if interface.is_domain {
+                        todo!("Domains not implemented")
+                    }
+
                     handles_out.push(HandleOut {
                         name: name.clone(),
                         transfer_type: HandleTransferType::Copy,
@@ -250,7 +324,7 @@ fn gen_command_in(
                 ));
             }
             Value::InArray(ty, transfer_mode) => {
-                let struct_ty = ty.codegen_resolve(ctx);
+                let struct_ty = ctx.resolve_type(ty);
 
                 buffers.push(Buffer {
                     source: BufferSource::TypedSlice(name.clone()),
@@ -269,7 +343,7 @@ fn gen_command_in(
                 ));
             }
             Value::OutArray(ty, transfer_mode) => {
-                let struct_ty = ty.codegen_resolve(ctx);
+                let struct_ty = ctx.resolve_type(ty);
 
                 buffers.push(Buffer {
                     source: BufferSource::TypedSlice(name.clone()),
@@ -348,6 +422,24 @@ fn gen_command_in(
         pub fn $name(
             $(for (name, ty) in args join (,) => $(name.as_str()): $ty)
         ) -> $(make_result())<$return_type> {
+
+            // defines a data_in variable
+            $(make_raw_data_in(namespace, ctx, &raw_data_in))
+
+
+            // TODO: process output
+            $(if raw_data_out.is_empty() {
+            } else {
+                $(make_raw_data_struct(
+                    namespace,
+                    ctx,
+                    Direction::Out,
+                    raw_data_out
+                        .iter()
+                        .map(|d| (d.name.clone(), d.ty.clone()))
+                ))
+            })
+
             $(for (name, ty) in uninit_vars {
                 let $(name.as_str()) = $(make_maybe_uninit())::<$ty>::uninit();
             })

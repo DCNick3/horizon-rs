@@ -15,9 +15,11 @@ pub struct IUserInterface {
 }
 impl IUserInterface {
     pub fn initialize() -> Result<()> {
+        let data_in = _pid_placeholder;
         todo!("Command codegen")
     }
     pub fn get_service(name: ServiceName) -> Result<RawHandle> {
+        let data_in = name;
         todo!("Command codegen")
     }
     pub fn register_service(
@@ -25,9 +27,18 @@ impl IUserInterface {
         max_sessions: u32,
         is_light: bool,
     ) -> Result<RawHandle> {
+        #[repr(C)]
+        struct In {
+            name: ServiceName,
+            is_light: bool,
+            max_sessions: u32,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 16]>;
+        let data_in: In = In { name, is_light, max_sessions };
         todo!("Command codegen")
     }
     pub fn unregister_service(name: ServiceName) -> Result<()> {
+        let data_in = name;
         todo!("Command codegen")
     }
 }
