@@ -128,7 +128,7 @@ impl IFileSystemProxyForLoader {
         todo!("Command codegen")
     }
     pub fn set_current_process() -> Result<()> {
-        let data_in = _pid_placeholder;
+        let data_in = 0u64;
         todo!("Command codegen")
     }
 }

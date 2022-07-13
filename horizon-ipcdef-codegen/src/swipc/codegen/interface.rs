@@ -140,7 +140,13 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
         } as Tokens)
     } else if let [data] = data {
         quote! {
-            let data_in = $(data.name.as_str());
+            let data_in = $(match data.source {
+                RawDataInSource::PidPlaceholder =>
+                    0u64,
+
+                RawDataInSource::Local =>
+                    $(data.name.as_str()),
+            });
         }
     } else {
         quote! {
