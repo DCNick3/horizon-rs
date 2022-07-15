@@ -1,7 +1,8 @@
 //! Contains raw types for Horizon IPC
 //!
 //! HIPC types for bitfields generated via bindgen:
-//!  bindgen --use-core --ctypes-prefix super::c_types --no-layout-tests hipc.h -o hipc.rs
+//!  `bindgen --use-core --ctypes-prefix super::c_types --no-layout-tests hipc.h -o hipc.rs`
+//!  `sed -i '/\#\[repr(align(4))\]/d' hipc.rs`
 
 mod c_types;
 

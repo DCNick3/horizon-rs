@@ -9,41 +9,79 @@ use arcstr::ArcStr;
 use convert_case::{Case, Casing};
 use genco::lang::rust::Tokens;
 use genco::prelude::*;
+use std::sync::Arc;
 
 fn make_interface_reference(current_namespace: &Namespace, name: &NamespacedIdent) -> Tokens {
     import_in(current_namespace, name)
 }
 
-fn make_session_handle_ref() -> Tokens {
+fn imp_session_handle_ref() -> Tokens {
     let imp = rust::import("horizon_ipc::cmif", "SessionHandleRef");
 
     quote!($imp)
 }
 
-fn make_session_handle() -> Tokens {
+fn imp_session_handle() -> Tokens {
     let imp = rust::import("horizon_ipc::cmif", "SessionHandle");
 
     quote!($imp)
 }
 
-fn make_result() -> Tokens {
+fn imp_result() -> Tokens {
     let imp = rust::import("horizon_error", "Result");
 
     quote!($imp)
 }
 
-fn make_raw_handle() -> Tokens {
+fn imp_raw_handle() -> Tokens {
     let imp = rust::import("horizon_ipc", "RawHandle");
 
     quote!($imp)
 }
 
-fn make_maybe_uninit() -> Tokens {
+fn imp_maybe_uninit() -> Tokens {
     let imp = rust::import("core::mem", "MaybeUninit");
 
     quote!($imp)
 }
 
+fn imp_hipc_header() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::hipc", "HipcHeader");
+
+    quote!($imp)
+}
+
+fn imp_hipc_special_header() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::hipc", "HipcSpecialHeader");
+
+    quote!($imp)
+}
+
+fn imp_in_pointer_desc() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::hipc", "HipcInPointerBufferDescriptor");
+
+    quote!($imp)
+}
+
+fn imp_out_pointer_desc() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::hipc", "HipcOutPointerBufferDescriptor");
+
+    quote!($imp)
+}
+
+fn imp_map_alias_desc() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::hipc", "HipcMapAliasBufferDescriptor");
+
+    quote!($imp)
+}
+
+fn imp_cmif_in_header() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::cmif", "CmifInHeader");
+
+    quote!($imp)
+}
+
+#[derive(Clone)]
 enum BufferSource {
     /// We have a byte slice in scope that should be converted to a buffer
     ByteSlice(ArcStr),
@@ -55,6 +93,7 @@ enum BufferSource {
     TypedSlice(ArcStr),
 }
 
+#[derive(Clone)]
 struct Buffer {
     source: BufferSource,
     direction: Direction,
@@ -95,92 +134,66 @@ enum HandleTransformType {
     Interface(NamespacedIdent),
 }
 
-fn make_raw_data_struct(
-    namespace: &Namespace,
-    ctx: &CodegenContext,
-    direction: Direction,
-    items: impl Iterator<Item = (ArcStr, NominalType)>,
-) -> Tokens {
-    let name = NamespacedIdent::new(namespace.clone(), ArcStr::from(format!("{:?}", direction)));
-
-    let s = Struct::try_new(
-        name.clone(),
-        items
-            .map(|(name, ty)| StructField {
-                name,
-                ty,
-                location: Span::default(),
-            })
-            .collect(),
-        vec![],
-        Span::default(),
-    )
-    .unwrap();
-
-    let size = s.layout(ctx).size();
-
-    let name = name.ident().as_str();
-
-    quote! {
-        #[repr(C)]
-        struct $name {
-            $(for field in s.fields join (,) {
-                $(field.name.as_str()): $(make_nominal_type(namespace, &field.ty))
-            })
-        }
-
-        let _ = ::core::mem::transmute::<$name, [u8; $size]>;
-    }
+struct CommandInterfaceInfo {
+    args: Vec<(ArcStr, Tokens)>,
+    results: Vec<(ArcStr, Tokens)>,
+    uninit_vars: Vec<(ArcStr, Tokens)>,
 }
 
-fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawDataIn]) -> Tokens {
-    if data.is_empty() {
-        (quote! {
-            let data_in = ();
-        } as Tokens)
-    } else if let [data] = data {
-        quote! {
-            let data_in = $(match data.source {
-                RawDataInSource::PidPlaceholder =>
-                    0u64,
-
-                RawDataInSource::Local =>
-                    $(data.name.as_str()),
-            });
-        }
-    } else {
-        quote! {
-            $(make_raw_data_struct(
-                namespace,
-                ctx,
-                Direction::In,
-                data
-                    .iter()
-                    .map(|d| (d.name.clone(), d.ty.clone()))
-            ))
-
-            let data_in: In = In {
-                $(for data in data join (,) {
-                    $(match data.source {
-                        RawDataInSource::PidPlaceholder =>
-                            $(data.name.as_str()): 0,
-
-                        RawDataInSource::Local =>
-                            $(data.name.as_str()),
-                    })
-                })
-            };
-        }
-    }
-}
-
-fn gen_command_in(
-    namespace: &Namespace,
-    tok: &mut Tokens,
-    ctx: &CodegenContext,
-    c: &Command,
+struct CommandWireFormatInfo {
     is_domain: bool,
-) {
+    buffers: Vec<Buffer>,
+    raw_data_in: Vec<RawDataIn>,
+    raw_data_out: Vec<RawDataOut>,
+    handles_in: Vec<HandleIn>,
+    handles_out: Vec<HandleOut>,
+    should_pass_pid: bool,
+}
+
+impl CommandWireFormatInfo {
+    pub fn has_special_header(&self) -> bool {
+        self.should_pass_pid || !self.handles_in.is_empty() || self.handles_out.is_empty()
+    }
+
+    fn get_buffers(&self, mut filter: impl FnMut(&Buffer) -> bool) -> Vec<Buffer> {
+        self.buffers
+            .iter()
+            .filter(move |b| filter(b))
+            .cloned()
+            .collect::<Vec<_>>()
+    }
+
+    pub fn in_pointer_buffers(&self) -> Vec<Buffer> {
+        self.get_buffers(|b| {
+            b.direction == Direction::In && b.transfer_mode == BufferTransferMode::Pointer
+        })
+    }
+
+    pub fn out_pointer_buffers(&self) -> Vec<Buffer> {
+        self.get_buffers(|b| {
+            b.direction == Direction::Out && b.transfer_mode == BufferTransferMode::Pointer
+        })
+    }
+
+    pub fn in_map_alias_buffers(&self) -> Vec<Buffer> {
+        self.get_buffers(|b| {
+            b.direction == Direction::In && b.transfer_mode == BufferTransferMode::MapAlias
+        })
+    }
+
+    pub fn out_map_alias_buffers(&self) -> Vec<Buffer> {
+        self.get_buffers(|b| {
+            b.direction == Direction::Out && b.transfer_mode == BufferTransferMode::MapAlias
+        })
+    }
+}
+
+fn collect_command_info(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    is_domain: bool,
+    command_args: &[(Option<ArcStr>, Arc<Value>)],
+) -> (CommandInterfaceInfo, CommandWireFormatInfo) {
     let mut args = Vec::new();
     let mut results = Vec::new();
     let mut uninit_vars = Vec::new();
@@ -193,7 +206,7 @@ fn gen_command_in(
 
     let mut should_pass_pid = false;
 
-    for (name, arg) in c.arguments.iter() {
+    for (name, arg) in command_args.iter() {
         let name = name
             .as_ref()
             .cloned()
@@ -311,7 +324,7 @@ fn gen_command_in(
                 args.push((
                     name,
                     quote! {
-                        $(make_raw_handle())
+                        $(imp_raw_handle())
                     },
                 ));
             }
@@ -325,7 +338,7 @@ fn gen_command_in(
                 results.push((
                     name,
                     quote! {
-                        $(make_raw_handle())
+                        $(imp_raw_handle())
                     },
                 ));
             }
@@ -411,13 +424,291 @@ fn gen_command_in(
     assert!(handles_in.len() <= 8, "Methods must take in <= 8 Handles");
     assert!(handles_out.len() <= 8, "Methods must output <= 8 Handles");
 
-    let return_type = if let [(_, res)] = results.as_slice() {
+    (
+        CommandInterfaceInfo {
+            args,
+            results,
+            uninit_vars,
+        },
+        CommandWireFormatInfo {
+            is_domain,
+            buffers,
+            raw_data_in,
+            raw_data_out,
+            handles_in,
+            handles_out,
+            should_pass_pid,
+        },
+    )
+}
+
+fn raw_data_struct(items: impl Iterator<Item = (ArcStr, NominalType)>) -> Struct {
+    let s = Struct::try_new(
+        NamespacedIdent::new(Arc::new(Vec::new()), arcstr::literal!("RawData")),
+        items
+            .map(|(name, ty)| StructField {
+                name,
+                ty,
+                location: Span::default(),
+            })
+            .collect(),
+        vec![],
+        Span::default(),
+    )
+    .unwrap();
+
+    s
+}
+
+fn make_raw_data_struct(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    direction: Direction,
+    items: impl Iterator<Item = (ArcStr, NominalType)>,
+) -> Tokens {
+    let name = NamespacedIdent::new(namespace.clone(), ArcStr::from(format!("{:?}", direction)));
+
+    let s = raw_data_struct(items);
+
+    let size = s.layout(ctx).size();
+
+    let name = name.ident().as_str();
+
+    quote! {
+        #[repr(C)]
+        struct $name {
+            $(for field in s.fields join (,) {
+                $(field.name.as_str()): $(make_nominal_type(namespace, &field.ty))
+            })
+        }
+
+        let _ = ::core::mem::transmute::<$name, [u8; $size]>;
+    }
+}
+
+fn make_raw_data_in_type(
+    namespace: &Namespace,
+    _ctx: &CodegenContext,
+    data: &[RawDataIn],
+) -> Tokens {
+    if data.is_empty() {
+        (quote! {
+            ()
+        } as Tokens)
+    } else if let [data] = data {
+        quote! {
+            $(match data.source {
+                RawDataInSource::PidPlaceholder => u64,
+                RawDataInSource::Local =>
+                    $(make_nominal_type(namespace, &data.ty)),
+            })
+        }
+    } else {
+        quote! {
+            In
+        }
+    }
+}
+
+fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawDataIn]) -> Tokens {
+    if data.is_empty() {
+        (quote! {
+            let data_in = ();
+        } as Tokens)
+    } else if let [data] = data {
+        quote! {
+            let data_in = $(match data.source {
+                RawDataInSource::PidPlaceholder =>
+                    0u64,
+
+                RawDataInSource::Local =>
+                    $(data.name.as_str()),
+            });
+        }
+    } else {
+        quote! {
+            $(make_raw_data_struct(
+                namespace,
+                ctx,
+                Direction::In,
+                data
+                    .iter()
+                    .map(|d| (d.name.clone(), d.ty.clone()))
+            ))
+
+            let data_in: In = In {
+                $(for data in data join (,) {
+                    $(match data.source {
+                        RawDataInSource::PidPlaceholder =>
+                            $(data.name.as_str()): 0,
+
+                        RawDataInSource::Local =>
+                            $(data.name.as_str()),
+                    })
+                })
+            };
+        }
+    }
+}
+
+fn make_request_struct(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    w_info: &CommandWireFormatInfo,
+) -> Tokens {
+    let in_pointer_buffers = w_info.in_pointer_buffers();
+    let out_pointer_buffers = w_info.out_pointer_buffers();
+    let in_map_aliases = w_info.in_map_alias_buffers();
+    let out_map_aliases = w_info.out_map_alias_buffers();
+
+    if w_info.is_domain {
+        todo!("Domain codegen")
+    }
+
+    // let's calculate offset at which the cmif header will be located (in words)
+    let cmif_header_offset = 2 + // HIPC header
+        if w_info.has_special_header() {
+            1 + // special header
+                (w_info.should_pass_pid as usize) * 2 +
+                w_info.handles_in.len() +
+                w_info.handles_out.len()
+        } else { 0 } +
+        w_info.in_pointer_buffers().len() * 2 +
+        w_info.in_map_alias_buffers().len() * 3 +
+        w_info.out_map_alias_buffers().len() * 3;
+
+    // use the offset to calculate cmif padding size
+    let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
+
+    let r: Tokens = quote! {
+        #[repr(packed)]
+        struct Request {
+            hipc: $(imp_hipc_header()),
+            $(if w_info.has_special_header() => special_header: $(imp_hipc_special_header()),)
+            $(for (i, b) in in_pointer_buffers.iter().enumerate() {
+                $(format!("in_pointer_desc_{}", i)): $(imp_in_pointer_desc()),
+            })
+            $(for (i, b) in in_map_aliases.iter().enumerate() {
+                $(format!("in_map_alias_desc_{}", i)): $(imp_map_alias_desc()),
+            })
+            $(for (i, b) in out_map_aliases.iter().enumerate() {
+                $(format!("out_map_alias_desc_{}", i)): $(imp_map_alias_desc()),
+            })
+
+            pre_padding: [u8; $pre_cmif_padding],
+            cmif: $(imp_cmif_in_header()),
+            raw_data: $(make_raw_data_in_type(namespace, ctx, &w_info.raw_data_in)),
+            post_padding: [u8; $(16 - pre_cmif_padding)],
+            // TODO: pointer buffer sizes, I think?
+
+
+            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+                $(format!("out_pointer_desc_{}", i)): $(imp_out_pointer_desc()),
+            })
+        }
+    };
+
+    r
+}
+
+pub enum CommandType {
+    Invalid = 0,
+    LegacyRequest = 1,
+    Close = 2,
+    LegacyControl = 3,
+    Request = 4,
+    Control = 5,
+    RequestWithContext = 6,
+    ControlWithContext = 7,
+}
+
+struct InHeaderMetadata {
+    // HIPC
+    ty: CommandType,
+    num_in_pointers: u32,
+    num_in_map_aliases: u32,
+    num_out_map_aliases: u32,
+    num_inout_map_aliases: u32,
+    num_data_words: u32,
+    out_pointer_mode: u32,
+    send_pid: bool,
+    num_copy_handles: u32,
+    num_move_handles: u32,
+
+    // CMIF
+    magic: u32,
+    version: u32,
+    command_id: u32,
+    token: u32,
+}
+
+fn collect_in_header_metadata() -> InHeaderMetadata {
+    todo!()
+}
+
+fn make_command_body(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    c: &Command,
+    i_info: &CommandInterfaceInfo,
+    w_info: &CommandWireFormatInfo,
+) -> Tokens {
+    let CommandInterfaceInfo { uninit_vars, .. } = i_info;
+    let CommandWireFormatInfo {
+        is_domain,
+        buffers,
+        raw_data_in,
+        raw_data_out,
+        handles_in,
+        handles_out,
+        should_pass_pid,
+    } = w_info;
+
+    let r: Tokens = quote! {
+        // defines a data_in variable
+        $(make_raw_data_in(namespace, ctx, &raw_data_in))
+
+        $(make_request_struct(namespace, ctx, w_info))
+
+        // TODO: process output
+        $(if raw_data_out.is_empty() {
+        } else {
+            $(make_raw_data_struct(
+                namespace,
+                ctx,
+                Direction::Out,
+                raw_data_out
+                    .iter()
+                    .map(|d| (d.name.clone(), d.ty.clone()))
+            ))
+        })
+
+        $(for (name, ty) in uninit_vars {
+            let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
+        })
+
+        todo!("Command codegen")
+    };
+
+    r
+}
+
+fn gen_command_in(
+    namespace: &Namespace,
+    tok: &mut Tokens,
+    ctx: &CodegenContext,
+    c: &Command,
+    is_domain: bool,
+) {
+    let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, &c.arguments);
+
+    let return_type = if let [(_, res)] = i_info.results.as_slice() {
         quote!($res) as Tokens
     } else {
         // TODO: doing this we lose names. This is not __that__ bad, but kinda meh...
         quote! {
             (
-                $(for (_, ty) in results.iter() join (,) => $ty)
+                $(for (_, ty) in i_info.results.iter() join (,) => $ty)
             )
         }
     };
@@ -426,31 +717,9 @@ fn gen_command_in(
     let name = c.name.to_case(Case::Snake);
     quote_in! { *tok =>
         pub fn $name(
-            $(for (name, ty) in args join (,) => $(name.as_str()): $ty)
-        ) -> $(make_result())<$return_type> {
-
-            // defines a data_in variable
-            $(make_raw_data_in(namespace, ctx, &raw_data_in))
-
-
-            // TODO: process output
-            $(if raw_data_out.is_empty() {
-            } else {
-                $(make_raw_data_struct(
-                    namespace,
-                    ctx,
-                    Direction::Out,
-                    raw_data_out
-                        .iter()
-                        .map(|d| (d.name.clone(), d.ty.clone()))
-                ))
-            })
-
-            $(for (name, ty) in uninit_vars {
-                let $(name.as_str()) = $(make_maybe_uninit())::<$ty>::uninit();
-            })
-
-            todo!("Command codegen")
+            $(for (name, ty) in &i_info.args join (,) => $(name.as_str()): $ty)
+        ) -> $(imp_result())<$return_type> {
+            $(make_command_body(namespace, ctx, c, &i_info, &w_info))
         }
     }
 }
@@ -474,7 +743,7 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
         quote! {
             pub struct $name {
                 // the generated interface object owns the session handle!
-                handle: $(make_session_handle()),
+                handle: $(imp_session_handle()),
             }
 
             impl $name {

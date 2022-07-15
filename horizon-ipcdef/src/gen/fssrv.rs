@@ -2,6 +2,11 @@ use bitflags::bitflags;
 use core::mem::MaybeUninit;
 use horizon_error::Result;
 use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::raw::cmif::CmifInHeader;
+use horizon_ipc::raw::hipc::{
+    HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
+    HipcOutPointerBufferDescriptor, HipcSpecialHeader,
+};
 use super::account::Uid;
 use super::ncm::ProgramId;
 #[repr(C)]
@@ -90,6 +95,14 @@ pub struct IFileSystemProxy {
 impl IFileSystemProxy {
     pub fn open_sd_card_file_system() -> Result<IFileSystem> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 8],
+        }
         todo!("Command codegen")
     }
 }
@@ -115,11 +128,30 @@ impl IFileSystemProxyForLoader {
         program_id: ProgramId,
     ) -> Result<(IFileSystem, CodeVerificationData)> {
         let data_in = program_id;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 0],
+            cmif: CmifInHeader,
+            raw_data: ProgramId,
+            post_padding: [u8; 16],
+            out_pointer_desc_0: HipcOutPointerBufferDescriptor,
+        }
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         todo!("Command codegen")
     }
     pub fn is_archived_program(process_id: u64) -> Result<bool> {
         let data_in = process_id;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            pre_padding: [u8; 4],
+            cmif: CmifInHeader,
+            raw_data: u64,
+            post_padding: [u8; 12],
+        }
         #[repr(C)]
         struct Out {
             out: bool,
@@ -129,6 +161,15 @@ impl IFileSystemProxyForLoader {
     }
     pub fn set_current_process() -> Result<()> {
         let data_in = 0u64;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: u64,
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
 }
@@ -177,34 +218,116 @@ impl IFileSystem {
         }
         let _ = ::core::mem::transmute::<In, [u8; 16]>;
         let data_in: In = In { option, size };
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: In,
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn delete_file(path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn create_directory(path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn delete_directory(path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn delete_directory_recursively(path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn rename_file(old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            in_pointer_desc_1: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 4],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 12],
+        }
         todo!("Command codegen")
     }
     pub fn rename_directory(old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            in_pointer_desc_1: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 4],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 12],
+        }
         todo!("Command codegen")
     }
     pub fn get_entry_type(path: &Path) -> Result<u32> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         #[repr(C)]
         struct Out {
             out: u32,
@@ -214,18 +337,55 @@ impl IFileSystem {
     }
     pub fn open_file(path: &Path, mode: u32) -> Result<IFile> {
         let data_in = mode;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 0],
+            cmif: CmifInHeader,
+            raw_data: u32,
+            post_padding: [u8; 16],
+        }
         todo!("Command codegen")
     }
     pub fn open_directory(path: &Path, mode: u32) -> Result<IDirectory> {
         let data_in = mode;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 0],
+            cmif: CmifInHeader,
+            raw_data: u32,
+            post_padding: [u8; 16],
+        }
         todo!("Command codegen")
     }
     pub fn commit() -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            pre_padding: [u8; 4],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 12],
+        }
         todo!("Command codegen")
     }
     pub fn get_free_space_size(path: &Path) -> Result<i64> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         #[repr(C)]
         struct Out {
             out: i64,
@@ -235,6 +395,16 @@ impl IFileSystem {
     }
     pub fn get_total_space_size(path: &Path) -> Result<i64> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         #[repr(C)]
         struct Out {
             out: i64,
@@ -244,10 +414,30 @@ impl IFileSystem {
     }
     pub fn clean_directory_recursively(path: &Path) -> Result<()> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         todo!("Command codegen")
     }
     pub fn get_file_time_stamp_raw(path: &Path) -> Result<FileTimeStampRaw> {
         let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            post_padding: [u8; 4],
+        }
         #[repr(C)]
         struct Out {
             out: FileTimeStampRaw,
@@ -262,6 +452,18 @@ impl IFileSystem {
         path: &Path,
     ) -> Result<()> {
         let data_in = query_id;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            in_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            out_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            pre_padding: [u8; 4],
+            cmif: CmifInHeader,
+            raw_data: QueryId,
+            post_padding: [u8; 12],
+        }
         todo!("Command codegen")
     }
 }

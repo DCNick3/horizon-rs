@@ -178,7 +178,10 @@ impl TokenStorage {
                     // we do it as a plain-text append because genco puts imports above everything
                     //   and it's a no-no for module-level attributes
                     // TODO: report to genco
-                    format!("#![allow(clippy::all)]\n{}", contents)
+                    format!(
+                        "#![allow(non_upper_case_globals, clippy::all)]\n{}",
+                        contents
+                    )
                 } else {
                     contents
                 };

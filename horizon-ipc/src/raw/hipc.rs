@@ -85,7 +85,6 @@ pub type u32_ = super::c_types::c_uint;
 pub type u16_ = super::c_types::c_ushort;
 pub type u8_ = super::c_types::c_uchar;
 #[repr(C)]
-#[repr(align(4))]
 #[derive(Debug, Copy, Clone)]
 pub struct HipcHeader {
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize], u16>,
@@ -261,7 +260,6 @@ impl HipcHeader {
     }
 }
 #[repr(C)]
-#[repr(align(4))]
 #[derive(Debug, Copy, Clone)]
 pub struct HipcSpecialHeader {
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize], u32>,
