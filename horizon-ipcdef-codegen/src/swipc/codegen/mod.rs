@@ -185,6 +185,7 @@ impl TokenStorage {
                                 unreachable_code,       // temporary for codegen debug
                                 unused_variables,       // temporary for codegen debug
                                 non_upper_case_globals, // forever, because we use PascalCase for bitfield arms
+                                dead_code,              // probably forever, because of 'field is never read' diags on request structs
                                 clippy::all,            // probably forever
                             )]
                             {}"},

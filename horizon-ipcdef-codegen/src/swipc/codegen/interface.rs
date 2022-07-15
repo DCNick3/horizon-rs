@@ -190,6 +190,13 @@ impl CommandWireFormatInfo {
         })
     }
 
+    pub fn out_pointer_sizes_count(&self) -> usize {
+        self.out_pointer_buffers()
+            .iter()
+            .filter(|b| !b.fixed_size)
+            .count()
+    }
+
     pub fn in_map_alias_buffers(&self) -> Vec<Buffer> {
         self.get_buffers(|b| {
             b.direction == Direction::In && b.transfer_mode == BufferTransferMode::MapAlias
@@ -595,7 +602,7 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
                     }),
                 })
 
-                $(for padding in s.paddings(ctx) {
+                $(for _ in s.paddings(ctx) {
                     $(padding_helper.next_padding_name()): Default::default(),
                 })
             };
@@ -623,6 +630,8 @@ fn make_request_struct(
         todo!("Domain codegen")
     }
 
+    let out_pointer_sizes_count = w_info.out_pointer_sizes_count();
+
     // let's calculate offset at which the cmif header will be located (in words)
     let cmif_header_offset = 2 + // HIPC header
         if w_info.has_special_header() {
@@ -638,8 +647,8 @@ fn make_request_struct(
         16 + // padding
         16 + // CMIF header
         w_info.in_raw_data_struct().layout(ctx).size() as usize +
-        out_pointer_buffers.len() * 2 + // OutPointer lengths as a u16 array
-        if out_pointer_buffers.len() % 2 != 0 { // padding for OutPointer length array
+        out_pointer_sizes_count * 2 + // OutPointer lengths as a u16 array
+        if out_pointer_sizes_count % 2 != 0 { // padding for OutPointer length array
             2
         } else  {
             0
@@ -664,13 +673,13 @@ fn make_request_struct(
                     $(format!("handle_{}", h.name)): $(imp_raw_handle()),
                 })
             })
-            $(for (i, b) in in_pointer_buffers.iter().enumerate() {
+            $(for (i, _) in in_pointer_buffers.iter().enumerate() {
                 $(format!("in_pointer_desc_{}", i)): $(imp_in_pointer_desc()),
             })
-            $(for (i, b) in in_map_aliases.iter().enumerate() {
+            $(for (i, _) in in_map_aliases.iter().enumerate() {
                 $(format!("in_map_alias_desc_{}", i)): $(imp_map_alias_desc()),
             })
-            $(for (i, b) in out_map_aliases.iter().enumerate() {
+            $(for (i, _) in out_map_aliases.iter().enumerate() {
                 $(format!("out_map_alias_desc_{}", i)): $(imp_map_alias_desc()),
             })
 
@@ -679,14 +688,16 @@ fn make_request_struct(
             raw_data: $(make_raw_data_in_type(namespace, ctx, &w_info.raw_data_in)),
             post_padding: [u8; $(16 - pre_cmif_padding)],
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
-                $(format!("out_pointer_size_{}", i)): u16,
+                $(if !b.fixed_size {
+                    $(format!("out_pointer_size_{}", i)): u16,
+                })
             })
-            $(if out_pointer_buffers.len() % 2 != 0 {
+            $(if out_pointer_sizes_count % 2 != 0 {
                 out_pointer_size_padding: u16,
             })
 
 
-            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+            $(for (i, _) in out_pointer_buffers.iter().enumerate() {
                 $(format!("out_pointer_desc_{}", i)): $(imp_out_pointer_desc()),
             })
         }
@@ -719,11 +730,7 @@ fn make_buffer_size(buffer: &Buffer) -> Tokens {
     }) as Tokens
 }
 
-fn make_request(
-    namespace: &Namespace,
-    ctx: &CodegenContext,
-    w_info: &CommandWireFormatInfo,
-) -> Tokens {
+fn make_request(w_info: &CommandWireFormatInfo) -> Tokens {
     let &CommandWireFormatInfo {
         should_pass_pid,
         command_id,
@@ -735,6 +742,8 @@ fn make_request(
     let out_pointer_buffers = w_info.out_pointer_buffers();
     let in_map_aliases = w_info.in_map_alias_buffers();
     let out_map_aliases = w_info.out_map_alias_buffers();
+
+    let out_pointer_sizes_count = w_info.out_pointer_sizes_count();
 
     // switchbrew:
     // > If it has value 0, the C descriptor functionality is disabled.
@@ -787,13 +796,13 @@ fn make_request(
                     $(format!("handle_{}", h.name)): $(h.name.as_str()),
                 })
             })
-            $(for (i, b) in in_pointer_buffers.iter().enumerate() {
+            $(for (i, _) in in_pointer_buffers.iter().enumerate() {
                 $(format!("in_pointer_desc_{}", i)): todo!(),
             })
-            $(for (i, b) in in_map_aliases.iter().enumerate() {
+            $(for (i, _) in in_map_aliases.iter().enumerate() {
                 $(format!("in_map_alias_desc_{}", i)): todo!(),
             })
-            $(for (i, b) in out_map_aliases.iter().enumerate() {
+            $(for (i, _) in out_map_aliases.iter().enumerate() {
                 $(format!("out_map_alias_desc_{}", i)): todo!(),
             })
 
@@ -808,13 +817,15 @@ fn make_request(
             post_padding: Default::default(),
 
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
-                $(format!("out_pointer_size_{}", i)): $(make_buffer_size(b)),
+                $(if !b.fixed_size {
+                    $(format!("out_pointer_size_{}", i)): $(make_buffer_size(b)),
+                })
             })
-            $(if out_pointer_buffers.len() % 2 != 0 {
+            $(if out_pointer_sizes_count % 2 != 0 {
                 out_pointer_size_padding: 0,
             })
 
-            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+            $(for (i, _) in out_pointer_buffers.iter().enumerate() {
                 $(format!("out_pointer_desc_{}", i)): todo!(),
             })
         }
@@ -837,20 +848,19 @@ pub enum CommandType {
 fn make_command_body(
     namespace: &Namespace,
     ctx: &CodegenContext,
-    c: &Command,
     i_info: &CommandInterfaceInfo,
     w_info: &CommandWireFormatInfo,
 ) -> Tokens {
     let CommandInterfaceInfo { uninit_vars, .. } = i_info;
     let CommandWireFormatInfo {
-        is_domain,
-        command_id,
-        buffers,
+        is_domain: _,
+        command_id: _,
+        buffers: _,
         raw_data_in,
         raw_data_out,
-        handles_in,
-        handles_out,
-        should_pass_pid,
+        handles_in: _,
+        handles_out: _,
+        should_pass_pid: _,
     } = w_info;
 
     let r: Tokens = quote! {
@@ -867,7 +877,7 @@ fn make_command_body(
         unsafe {
             ::core::ptr::write(
                 $(imp_get_ipc_buffer_for())(),
-                $(make_request(namespace, ctx, w_info))
+                $(make_request(w_info))
             )
         };
 
@@ -916,7 +926,7 @@ fn gen_command_in(
         pub fn $name(
             $(for (name, ty) in &i_info.args join (,) => $(name.as_str()): $ty)
         ) -> $(imp_result())<$return_type> {
-            $(make_command_body(namespace, ctx, c, &i_info, &w_info))
+            $(make_command_body(namespace, ctx, &i_info, &w_info))
         }
     }
 }

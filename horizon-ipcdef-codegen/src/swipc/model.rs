@@ -243,13 +243,6 @@ pub struct BufferType {
     pub extra_attrs: BufferExtraAttrs,
 }
 
-impl BufferType {
-    pub fn try_from_id(_id: u64) -> anyhow::Result<Self> {
-        todo!()
-        // Ok(Self {})
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Direction {
     In,

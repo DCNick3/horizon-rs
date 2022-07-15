@@ -101,12 +101,10 @@ impl IProcessManagerInterface {
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
             post_padding: [u8; 12],
-            out_pointer_size_0: u16,
-            out_pointer_size_padding: u16,
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 72]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 68]>;
         unsafe impl IpcBufferRepr for Request {}
         let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
         unsafe {
@@ -124,9 +122,6 @@ impl IProcessManagerInterface {
                     },
                     raw_data: data_in,
                     post_padding: Default::default(),
-                    out_pointer_size_0: ::core::mem::size_of_val(&out_program_info)
-                        as u16,
-                    out_pointer_size_padding: 0,
                     out_pointer_desc_0: todo!(),
                 },
             )

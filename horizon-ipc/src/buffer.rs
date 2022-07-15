@@ -1,5 +1,4 @@
 use core::arch::asm;
-use core::mem::MaybeUninit;
 
 /// Get a (mutable) reference to thread-local IPC buffer
 ///  
@@ -28,7 +27,7 @@ pub unsafe fn get_ipc_buffer_mut() -> &'static mut [u8] {
 /// Do not store it's result across IPC calls
 pub unsafe fn get_ipc_buffer() -> &'static [u8] {
     // SAFETY: we return a read-only reference, which is safe
-    unsafe { get_ipc_buffer_mut() }
+    get_ipc_buffer_mut()
 }
 
 /// A type that can be found in IpcBuffer
