@@ -90,7 +90,7 @@ pub enum FileSystemType {
     ApplicationPackage = 7,
 }
 pub struct IFileSystemProxy {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IFileSystemProxy {
     pub fn open_sd_card_file_system() -> Result<IFileSystem> {
@@ -134,7 +134,7 @@ const _: fn() = || {
 };
 
 pub struct IFileSystemProxyForLoader {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IFileSystemProxyForLoader {
     pub fn open_code_file_system(
@@ -268,7 +268,7 @@ pub enum QueryId {
     QueryUnpreparedFileInformation = 3,
 }
 pub struct IFileSystem {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IFileSystem {
     pub fn create_file(path: &Path, size: i64, option: CreateOption) -> Result<()> {
@@ -771,10 +771,10 @@ impl IFileSystem {
     }
 }
 pub struct IFile {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IFile {}
 pub struct IDirectory {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IDirectory {}

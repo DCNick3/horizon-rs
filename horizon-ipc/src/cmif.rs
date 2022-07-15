@@ -25,7 +25,7 @@ pub trait AsRawSessionHandle {
 }
 
 /// A non-type-safe owning handle to some IPC session
-pub struct SessionHandle(RawHandle);
+pub struct SessionHandle(pub RawHandle);
 
 impl SessionHandle {
     pub fn as_ref(&self) -> SessionHandleRef<'_> {

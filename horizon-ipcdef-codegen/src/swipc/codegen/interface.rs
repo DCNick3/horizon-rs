@@ -921,7 +921,7 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
         quote! {
             pub struct $name {
                 // the generated interface object owns the session handle!
-                handle: $(imp_session_handle()),
+                pub(crate) handle: $(imp_session_handle()),
             }
 
             impl $name {

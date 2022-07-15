@@ -155,7 +155,7 @@ impl TokenStorage {
 
                 let tok = quote! {
                     $(for module in child_modules.iter() {
-                        mod $(module.as_str());
+                        pub mod $(module.as_str());
                     })
 
                     $tok

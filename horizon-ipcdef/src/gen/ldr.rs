@@ -36,7 +36,7 @@ const _: fn() = || {
 };
 
 pub struct IProcessManagerInterface {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IProcessManagerInterface {
     pub fn create_process(

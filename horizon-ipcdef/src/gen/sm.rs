@@ -13,7 +13,7 @@ const _: fn() = || {
 };
 
 pub struct IUserInterface {
-    handle: SessionHandle,
+    pub(crate) handle: SessionHandle,
 }
 impl IUserInterface {
     pub fn initialize() -> Result<()> {
