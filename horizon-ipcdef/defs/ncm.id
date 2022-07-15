@@ -1,1 +1,16 @@
 type ncm::ProgramId = u64;
+
+enum ncm::StorageId : u8 {
+    None            = 0,
+    Host            = 1,
+    GameCard        = 2,
+    BuiltInSystem   = 3,
+    BuiltInUser     = 4,
+    SdCard          = 5,
+    Any             = 6,
+};
+
+struct ncm::ProgramLocation {
+    ncm::ProgramId program_id;
+    ncm::StorageId storage_id;
+};

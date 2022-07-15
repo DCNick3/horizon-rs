@@ -556,6 +556,12 @@ fn make_request_struct(
     ctx: &CodegenContext,
     w_info: &CommandWireFormatInfo,
 ) -> Tokens {
+    let &CommandWireFormatInfo {
+        should_pass_pid,
+        ref handles_in,
+        ..
+    } = w_info;
+
     let in_pointer_buffers = w_info.in_pointer_buffers();
     let out_pointer_buffers = w_info.out_pointer_buffers();
     let in_map_aliases = w_info.in_map_alias_buffers();
@@ -569,13 +575,12 @@ fn make_request_struct(
     let cmif_header_offset = 2 + // HIPC header
         if w_info.has_special_header() {
             1 + // special header
-                (w_info.should_pass_pid as usize) * 2 +
-                w_info.handles_in.len() +
-                w_info.handles_out.len()
+                (should_pass_pid as usize) * 2 +
+                handles_in.len()
         } else { 0 } +
-        w_info.in_pointer_buffers().len() * 2 +
-        w_info.in_map_alias_buffers().len() * 3 +
-        w_info.out_map_alias_buffers().len() * 3;
+        in_pointer_buffers.len() * 2 +
+        in_map_aliases.len() * 3 +
+        out_map_aliases.len() * 3;
 
     // use the offset to calculate cmif padding size
     let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
@@ -584,7 +589,14 @@ fn make_request_struct(
         #[repr(packed)]
         struct Request {
             hipc: $(imp_hipc_header()),
-            $(if w_info.has_special_header() => special_header: $(imp_hipc_special_header()),)
+            $(if w_info.has_special_header() {
+                special_header: $(imp_hipc_special_header()),
+                $(if should_pass_pid =>
+                    pid_placeholder: u64,)
+                $(for h in handles_in {
+                    $(format!("handle_{}", h.name)): $(imp_raw_handle()),
+                })
+            })
             $(for (i, b) in in_pointer_buffers.iter().enumerate() {
                 $(format!("in_pointer_desc_{}", i)): $(imp_in_pointer_desc()),
             })

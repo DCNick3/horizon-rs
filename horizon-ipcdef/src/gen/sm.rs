@@ -22,6 +22,7 @@ impl IUserInterface {
         struct Request {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
+            pid_placeholder: u64,
             pre_padding: [u8; 12],
             cmif: CmifInHeader,
             raw_data: u64,
