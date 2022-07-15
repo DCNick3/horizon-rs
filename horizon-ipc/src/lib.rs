@@ -10,4 +10,3 @@ pub mod cmif;
 pub mod conv_traits;
 pub mod hipc;
 pub mod raw;
-pub mod sm;

@@ -66,6 +66,7 @@ impl IProcessManagerInterface {
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: In,
+            raw_data_word_padding: [u8; 0],
             post_padding: [u8; 16],
         }
         // Compiler time request size check
@@ -75,7 +76,7 @@ impl IProcessManagerInterface {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, true),
                     special_header: HipcSpecialHeader::new(false, 1, 0),
                     handle_reslimit_h: reslimit_h,
                     pre_padding: Default::default(),
@@ -86,6 +87,7 @@ impl IProcessManagerInterface {
                         token: 0,
                     },
                     raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
                 },
             )
@@ -99,10 +101,11 @@ impl IProcessManagerInterface {
         struct Request {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
-            pre_padding: [u8; 4],
+            pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
-            post_padding: [u8; 12],
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
         // Compiler time request size check
@@ -113,7 +116,7 @@ impl IProcessManagerInterface {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 3, 0, true),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 3, 0, true),
                     special_header: HipcSpecialHeader::new(false, 0, 0),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -123,6 +126,7 @@ impl IProcessManagerInterface {
                         token: 0,
                     },
                     raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
                     out_pointer_desc_0: todo!(),
                 },
@@ -137,10 +141,11 @@ impl IProcessManagerInterface {
         struct Request {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
-            pre_padding: [u8; 4],
+            pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
-            post_padding: [u8; 12],
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
@@ -149,7 +154,7 @@ impl IProcessManagerInterface {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, true),
                     special_header: HipcSpecialHeader::new(false, 0, 0),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -159,6 +164,7 @@ impl IProcessManagerInterface {
                         token: 0,
                     },
                     raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
                 },
             )
@@ -172,10 +178,11 @@ impl IProcessManagerInterface {
         struct Request {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
-            pre_padding: [u8; 4],
+            pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: PinId,
-            post_padding: [u8; 12],
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
@@ -184,7 +191,7 @@ impl IProcessManagerInterface {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
                     special_header: HipcSpecialHeader::new(false, 0, 0),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -194,6 +201,7 @@ impl IProcessManagerInterface {
                         token: 0,
                     },
                     raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
                 },
             )
@@ -207,19 +215,20 @@ impl IProcessManagerInterface {
         struct Request {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
-            pre_padding: [u8; 4],
+            pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: bool,
-            post_padding: [u8; 12],
+            raw_data_word_padding: [u8; 3],
+            post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 45]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 9, 0, 0, true),
                     special_header: HipcSpecialHeader::new(false, 0, 0),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -229,6 +238,7 @@ impl IProcessManagerInterface {
                         token: 0,
                     },
                     raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
                 },
             )

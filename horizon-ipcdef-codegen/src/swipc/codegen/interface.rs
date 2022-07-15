@@ -610,6 +610,57 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
     }
 }
 
+struct RequestSizes {
+    cmif_header_offset: usize,
+    data_size: usize,
+    request_size: usize,
+}
+
+fn request_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> RequestSizes {
+    let &CommandWireFormatInfo {
+        should_pass_pid,
+        ref handles_in,
+        ..
+    } = w_info;
+
+    let in_pointer_buffers = w_info.in_pointer_buffers();
+    let out_pointer_buffers = w_info.out_pointer_buffers();
+    let in_map_aliases = w_info.in_map_alias_buffers();
+    let out_map_aliases = w_info.out_map_alias_buffers();
+    let out_pointer_sizes_count = w_info.out_pointer_sizes_count();
+
+    let cmif_header_offset = 8 + // HIPC header
+        if w_info.has_special_header() {
+            4 + // special header
+                (should_pass_pid as usize) * 8 +
+                handles_in.len() * 4
+        } else { 0 } +
+        in_pointer_buffers.len() * 8 + // descriptors
+        in_map_aliases.len() * 12 + // descriptors
+        out_map_aliases.len() * 12; // descriptors
+
+    let raw_data_size = w_info.in_raw_data_struct().layout(ctx).size();
+
+    let data_size = 16 + // padding
+        16 + // CMIF header
+        raw_data_size as usize +
+        ((4 - raw_data_size % 4) % 4) as usize + // pad raw data to word size (4 bytes)
+        out_pointer_sizes_count * 2 + // OutPointer lengths as a u16 array
+        if out_pointer_sizes_count % 2 != 0 { // padding for OutPointer length array
+            2
+        } else  {
+            0
+        };
+
+    let request_size = cmif_header_offset + data_size + out_pointer_buffers.len() * 8; // descriptors
+
+    RequestSizes {
+        cmif_header_offset,
+        data_size,
+        request_size,
+    }
+}
+
 fn make_request_struct(
     namespace: &Namespace,
     ctx: &CodegenContext,
@@ -632,28 +683,11 @@ fn make_request_struct(
 
     let out_pointer_sizes_count = w_info.out_pointer_sizes_count();
 
-    // let's calculate offset at which the cmif header will be located (in words)
-    let cmif_header_offset = 2 + // HIPC header
-        if w_info.has_special_header() {
-            1 + // special header
-                (should_pass_pid as usize) * 2 +
-                handles_in.len()
-        } else { 0 } +
-        in_pointer_buffers.len() * 2 + // descriptors
-        in_map_aliases.len() * 3 + // descriptors
-        out_map_aliases.len() * 3; // descriptors
-
-    let request_size = cmif_header_offset * 4 +
-        16 + // padding
-        16 + // CMIF header
-        w_info.in_raw_data_struct().layout(ctx).size() as usize +
-        out_pointer_sizes_count * 2 + // OutPointer lengths as a u16 array
-        if out_pointer_sizes_count % 2 != 0 { // padding for OutPointer length array
-            2
-        } else  {
-            0
-        } +
-        out_pointer_buffers.len() * 8; // descriptors
+    let RequestSizes {
+        cmif_header_offset,
+        request_size,
+        ..
+    } = request_sizes(ctx, w_info);
 
     if request_size > 0x100 {
         panic!("Request struct is too large, would not fit into the IPC command buffer")
@@ -661,6 +695,10 @@ fn make_request_struct(
 
     // use the offset to calculate cmif padding size
     let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
+
+    let raw_data_size = w_info.in_raw_data_struct().layout(ctx).size();
+
+    let raw_data_word_padding = (4 - (raw_data_size % 4)) % 4;
 
     let r: Tokens = quote! {
         #[repr(packed)]
@@ -686,6 +724,7 @@ fn make_request_struct(
             pre_padding: [u8; $pre_cmif_padding],
             cmif: $(imp_cmif_in_header()),
             raw_data: $(make_raw_data_in_type(namespace, ctx, &w_info.raw_data_in)),
+            raw_data_word_padding: [u8; $raw_data_word_padding],
             post_padding: [u8; $(16 - pre_cmif_padding)],
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
                 $(if !b.fixed_size {
@@ -703,7 +742,7 @@ fn make_request_struct(
         }
 
         _comment_!("Compiler time request size check");
-        let _ = ::core::mem::transmute::<Request, [u8; $request_size]>;
+        let _ = ::core::mem::transmute::<Request, [u8; $(request_size)]>;
 
         // SAFETY: we checked the size before, so it should fit
         unsafe impl $(imp_ipc_buffer_repr()) for Request {}
@@ -730,7 +769,7 @@ fn make_buffer_size(buffer: &Buffer) -> Tokens {
     }) as Tokens
 }
 
-fn make_request(w_info: &CommandWireFormatInfo) -> Tokens {
+fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
     let &CommandWireFormatInfo {
         should_pass_pid,
         command_id,
@@ -758,6 +797,9 @@ fn make_request(w_info: &CommandWireFormatInfo) -> Tokens {
     //  nor an "inlined" buffer after the raw data
     // so, it's either nothing or 2+N
 
+    let sizes = request_sizes(ctx, w_info);
+    assert_eq!(sizes.data_size % 4, 0, "data_size should be multiple of 4");
+
     let out_pointer_mode = if out_pointer_buffers.is_empty() {
         0
     } else {
@@ -772,7 +814,7 @@ fn make_request(w_info: &CommandWireFormatInfo) -> Tokens {
                 $(in_map_aliases.len()),
                 $(out_map_aliases.len()),
                 0, // num_inout_map_aliases
-                0, // TODO: num_data_words
+                $(sizes.data_size / 4), // num_data_words
                 $(out_pointer_mode),
                 0, // recv_list_offset
                 $(if w_info.has_special_header() {
@@ -814,6 +856,7 @@ fn make_request(w_info: &CommandWireFormatInfo) -> Tokens {
                 token: 0,
             },
             raw_data: data_in,
+            raw_data_word_padding: Default::default(),
             post_padding: Default::default(),
 
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
@@ -877,7 +920,7 @@ fn make_command_body(
         unsafe {
             ::core::ptr::write(
                 $(imp_get_ipc_buffer_for())(),
-                $(make_request(w_info))
+                $(make_request(ctx, w_info))
             )
         };
 
