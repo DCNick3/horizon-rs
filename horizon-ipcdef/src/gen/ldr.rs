@@ -61,6 +61,20 @@ impl IProcessManagerInterface {
             raw_data: In,
             post_padding: [u8; 16],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 1, 0),
+            handle_reslimit_h: reslimit_h,
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 0,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn get_program_info(loc: ProgramLocation) -> Result<ProgramInfo> {
@@ -75,6 +89,20 @@ impl IProcessManagerInterface {
             post_padding: [u8; 12],
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 3, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 1,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+            out_pointer_desc_0: todo!(),
+        };
         let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
         todo!("Command codegen")
     }
@@ -89,6 +117,19 @@ impl IProcessManagerInterface {
             raw_data: ProgramLocation,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 2,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out_id: PinId,
@@ -107,6 +148,19 @@ impl IProcessManagerInterface {
             raw_data: PinId,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 3,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn set_enabled_program_verification(enabled: bool) -> Result<()> {
@@ -120,6 +174,19 @@ impl IProcessManagerInterface {
             raw_data: bool,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 4,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
 }

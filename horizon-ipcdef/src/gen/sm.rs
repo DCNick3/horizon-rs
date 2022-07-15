@@ -28,6 +28,20 @@ impl IUserInterface {
             raw_data: u64,
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(true, 0, 0),
+            pid_placeholder: 0,
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 0,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn get_service(name: ServiceName) -> Result<RawHandle> {
@@ -40,6 +54,18 @@ impl IUserInterface {
             raw_data: ServiceName,
             post_padding: [u8; 8],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 1,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn register_service(
@@ -63,6 +89,18 @@ impl IUserInterface {
             raw_data: In,
             post_padding: [u8; 8],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 2,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn unregister_service(name: ServiceName) -> Result<()> {
@@ -76,6 +114,19 @@ impl IUserInterface {
             raw_data: ServiceName,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 3,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
 }

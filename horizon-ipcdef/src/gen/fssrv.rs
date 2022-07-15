@@ -103,6 +103,18 @@ impl IFileSystemProxy {
             raw_data: (),
             post_padding: [u8; 8],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 18,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
 }
@@ -138,6 +150,20 @@ impl IFileSystemProxyForLoader {
             post_padding: [u8; 16],
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 3, 0, false),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 0,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+            out_pointer_desc_0: todo!(),
+        };
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         todo!("Command codegen")
     }
@@ -152,6 +178,19 @@ impl IFileSystemProxyForLoader {
             raw_data: u64,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 1,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out: bool,
@@ -171,6 +210,20 @@ impl IFileSystemProxyForLoader {
             raw_data: u64,
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(true, 0, 0),
+            pid_placeholder: 0,
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 2,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
 }
@@ -229,6 +282,20 @@ impl IFileSystem {
             raw_data: In,
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 0,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn delete_file(path: &Path) -> Result<()> {
@@ -243,6 +310,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 1,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn create_directory(path: &Path) -> Result<()> {
@@ -257,6 +338,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 2,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn delete_directory(path: &Path) -> Result<()> {
@@ -271,6 +366,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 3,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn delete_directory_recursively(path: &Path) -> Result<()> {
@@ -285,6 +394,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 4,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn rename_file(old_path: &Path, new_path: &Path) -> Result<()> {
@@ -300,6 +423,21 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 2, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            in_pointer_desc_1: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 5,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn rename_directory(old_path: &Path, new_path: &Path) -> Result<()> {
@@ -315,6 +453,21 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 2, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            in_pointer_desc_1: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 6,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn get_entry_type(path: &Path) -> Result<u32> {
@@ -329,6 +482,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 7,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out: u32,
@@ -347,6 +514,19 @@ impl IFileSystem {
             raw_data: u32,
             post_padding: [u8; 16],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, false),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 8,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn open_directory(path: &Path, mode: u32) -> Result<IDirectory> {
@@ -360,6 +540,19 @@ impl IFileSystem {
             raw_data: u32,
             post_padding: [u8; 16],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, false),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 9,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn commit() -> Result<()> {
@@ -373,6 +566,19 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 10,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn get_free_space_size(path: &Path) -> Result<i64> {
@@ -387,6 +593,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 11,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out: i64,
@@ -406,6 +626,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 12,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out: i64,
@@ -425,6 +659,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 13,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
     pub fn get_file_time_stamp_raw(path: &Path) -> Result<FileTimeStampRaw> {
@@ -439,6 +687,20 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 14,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         #[repr(C)]
         struct Out {
             out: FileTimeStampRaw,
@@ -465,6 +727,22 @@ impl IFileSystem {
             raw_data: QueryId,
             post_padding: [u8; 12],
         }
+        let request: Request = Request {
+            hipc: HipcHeader::new(4, 1, 1, 1, 0, 0, 0, 0, true),
+            special_header: HipcSpecialHeader::new(false, 0, 0),
+            in_pointer_desc_0: todo!(),
+            in_map_alias_desc_0: todo!(),
+            out_map_alias_desc_0: todo!(),
+            pre_padding: Default::default(),
+            cmif: CmifInHeader {
+                magic: CmifInHeader::MAGIC,
+                version: 1,
+                command_id: 15,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+        };
         todo!("Command codegen")
     }
 }

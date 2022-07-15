@@ -142,6 +142,7 @@ struct CommandInterfaceInfo {
 
 struct CommandWireFormatInfo {
     is_domain: bool,
+    command_id: u32,
     buffers: Vec<Buffer>,
     raw_data_in: Vec<RawDataIn>,
     raw_data_out: Vec<RawDataOut>,
@@ -186,13 +187,27 @@ impl CommandWireFormatInfo {
             b.direction == Direction::Out && b.transfer_mode == BufferTransferMode::MapAlias
         })
     }
+
+    pub fn in_copy_handles(&self) -> usize {
+        self.handles_in
+            .iter()
+            .filter(|h| h.transfer_type == HandleTransferType::Copy)
+            .count()
+    }
+
+    pub fn in_move_handles(&self) -> usize {
+        self.handles_in
+            .iter()
+            .filter(|h| h.transfer_type == HandleTransferType::Move)
+            .count()
+    }
 }
 
 fn collect_command_info(
     namespace: &Namespace,
     ctx: &CodegenContext,
     is_domain: bool,
-    command_args: &[(Option<ArcStr>, Arc<Value>)],
+    command: &Command,
 ) -> (CommandInterfaceInfo, CommandWireFormatInfo) {
     let mut args = Vec::new();
     let mut results = Vec::new();
@@ -206,7 +221,7 @@ fn collect_command_info(
 
     let mut should_pass_pid = false;
 
-    for (name, arg) in command_args.iter() {
+    for (name, arg) in command.arguments.iter() {
         let name = name
             .as_ref()
             .cloned()
@@ -432,6 +447,7 @@ fn collect_command_info(
         },
         CommandWireFormatInfo {
             is_domain,
+            command_id: command.id,
             buffers,
             raw_data_in,
             raw_data_out,
@@ -591,8 +607,7 @@ fn make_request_struct(
             hipc: $(imp_hipc_header()),
             $(if w_info.has_special_header() {
                 special_header: $(imp_hipc_special_header()),
-                $(if should_pass_pid =>
-                    pid_placeholder: u64,)
+                $(if should_pass_pid => pid_placeholder: u64,)
                 $(for h in handles_in {
                     $(format!("handle_{}", h.name)): $(imp_raw_handle()),
                 })
@@ -623,6 +638,103 @@ fn make_request_struct(
     r
 }
 
+fn make_request(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    w_info: &CommandWireFormatInfo,
+) -> Tokens {
+    let &CommandWireFormatInfo {
+        should_pass_pid,
+        command_id,
+        ref handles_in,
+        ..
+    } = w_info;
+
+    let in_pointer_buffers = w_info.in_pointer_buffers();
+    let out_pointer_buffers = w_info.out_pointer_buffers();
+    let in_map_aliases = w_info.in_map_alias_buffers();
+    let out_map_aliases = w_info.out_map_alias_buffers();
+
+    // switchbrew:
+    // > If it has value 0, the C descriptor functionality is disabled.
+    // > If it has value 1, there is an "inlined" C buffer after the raw data.
+    // >  Received data is copied to ROUND_UP(cmdbuf+raw_size+index, 16)
+    // > If it has value 2, there is a single C descriptor.
+    // > Otherwise it has (flag-2) C descriptors.
+    // >  In this case, index picks which C descriptor to copy received data to
+    // >  [instead of picking the offset into the buffer].
+    //
+    // we do not use neither the single C (OutPointer) descriptor (because it's for servers)
+    //  nor an "inlined" buffer after the raw data
+    // so, it's either nothing or 2+N
+
+    let out_pointer_mode = if out_pointer_buffers.is_empty() {
+        0
+    } else {
+        2 + out_pointer_buffers.len()
+    };
+
+    let r: Tokens = quote! {
+        Request {
+            hipc: $(imp_hipc_header())::new(
+                $(CommandType::Request as u32),
+                $(in_pointer_buffers.len()),
+                $(in_map_aliases.len()),
+                $(out_map_aliases.len()),
+                0, // num_inout_map_aliases
+                0, // TODO: num_data_words
+                $(out_pointer_mode),
+                0, // recv_list_offset
+                $(if w_info.has_special_header() {
+                    true
+                } else {
+                    false
+                }),
+            ),
+            $(if w_info.has_special_header() {
+                special_header: $(imp_hipc_special_header())::new(
+                    $(if should_pass_pid {
+                        true
+                    } else {
+                        false
+                    }),
+                    $(w_info.in_copy_handles()),
+                    $(w_info.in_move_handles()),
+                ),
+                $(if should_pass_pid => pid_placeholder: 0,)
+                $(for h in handles_in {
+                    $(format!("handle_{}", h.name)): $(h.name.as_str()),
+                })
+            })
+            $(for (i, b) in in_pointer_buffers.iter().enumerate() {
+                $(format!("in_pointer_desc_{}", i)): todo!(),
+            })
+            $(for (i, b) in in_map_aliases.iter().enumerate() {
+                $(format!("in_map_alias_desc_{}", i)): todo!(),
+            })
+            $(for (i, b) in out_map_aliases.iter().enumerate() {
+                $(format!("out_map_alias_desc_{}", i)): todo!(),
+            })
+
+            pre_padding: Default::default(),
+            cmif: $(imp_cmif_in_header()) {
+                magic: $(imp_cmif_in_header())::MAGIC,
+                version: 1,
+                command_id: $command_id,
+                token: 0,
+            },
+            raw_data: data_in,
+            post_padding: Default::default(),
+
+            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+                $(format!("out_pointer_desc_{}", i)): todo!(),
+            })
+        }
+    };
+
+    r
+}
+
 pub enum CommandType {
     Invalid = 0,
     LegacyRequest = 1,
@@ -632,30 +744,6 @@ pub enum CommandType {
     Control = 5,
     RequestWithContext = 6,
     ControlWithContext = 7,
-}
-
-struct InHeaderMetadata {
-    // HIPC
-    ty: CommandType,
-    num_in_pointers: u32,
-    num_in_map_aliases: u32,
-    num_out_map_aliases: u32,
-    num_inout_map_aliases: u32,
-    num_data_words: u32,
-    out_pointer_mode: u32,
-    send_pid: bool,
-    num_copy_handles: u32,
-    num_move_handles: u32,
-
-    // CMIF
-    magic: u32,
-    version: u32,
-    command_id: u32,
-    token: u32,
-}
-
-fn collect_in_header_metadata() -> InHeaderMetadata {
-    todo!()
 }
 
 fn make_command_body(
@@ -668,6 +756,7 @@ fn make_command_body(
     let CommandInterfaceInfo { uninit_vars, .. } = i_info;
     let CommandWireFormatInfo {
         is_domain,
+        command_id,
         buffers,
         raw_data_in,
         raw_data_out,
@@ -681,6 +770,10 @@ fn make_command_body(
         $(make_raw_data_in(namespace, ctx, &raw_data_in))
 
         $(make_request_struct(namespace, ctx, w_info))
+
+        // TODO: write directly to IPC buffer
+        // TODO: check that it fits in IPC buffer
+        let request: Request = $(make_request(namespace, ctx, w_info));
 
         // TODO: process output
         $(if raw_data_out.is_empty() {
@@ -712,7 +805,7 @@ fn gen_command_in(
     c: &Command,
     is_domain: bool,
 ) {
-    let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, &c.arguments);
+    let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, c);
 
     let return_type = if let [(_, res)] = i_info.results.as_slice() {
         quote!($res) as Tokens

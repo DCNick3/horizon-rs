@@ -17,6 +17,50 @@ from_bytes_impl_transmute!(HipcInPointerBufferDescriptor);
 from_bytes_impl_transmute!(HipcOutPointerBufferDescriptor);
 from_bytes_impl_transmute!(HipcMapAliasBufferDescriptor);
 
+impl HipcHeader {
+    pub fn new(
+        type_: u16,
+        num_in_pointers: u32,
+        num_in_map_aliases: u32,
+        num_out_map_aliases: u32,
+        num_inout_map_aliases: u32,
+        num_data_words: u32,
+        out_pointer_mode: u32,
+        recv_list_offset: u32,
+        has_special_header: bool,
+    ) -> Self {
+        // TODO: make bitfield construction const
+        Self {
+            _bitfield_1: HipcHeader::new_bitfield_1(
+                type_,
+                num_in_pointers,
+                num_in_map_aliases,
+                num_out_map_aliases,
+                num_inout_map_aliases,
+                num_data_words,
+                out_pointer_mode,
+                0,
+                recv_list_offset,
+                has_special_header as _,
+            ),
+        }
+    }
+}
+
+impl HipcSpecialHeader {
+    pub fn new(send_pid: bool, num_copy_handles: u32, num_move_handles: u32) -> Self {
+        // TODO: make bitfield construction const
+        Self {
+            _bitfield_1: HipcSpecialHeader::new_bitfield_1(
+                send_pid as _,
+                num_copy_handles,
+                num_move_handles,
+                0,
+            ),
+        }
+    }
+}
+
 impl HipcInPointerBufferDescriptor {
     pub fn new(index: usize, address: usize, size: usize) -> Self {
         assert_eq!(index >> 6, 0, "Invalid buffer index");
