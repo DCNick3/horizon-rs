@@ -83,6 +83,18 @@ fn imp_cmif_in_header() -> Tokens {
     quote!($imp)
 }
 
+fn imp_ipc_buffer_repr() -> Tokens {
+    let imp = rust::import("horizon_ipc::buffer", "IpcBufferRepr");
+
+    quote!($imp)
+}
+
+fn imp_get_ipc_buffer_for() -> Tokens {
+    let imp = rust::import("horizon_ipc::buffer", "get_ipc_buffer_for");
+
+    quote!($imp)
+}
+
 #[derive(Clone)]
 enum BufferSource {
     /// We have a byte slice in scope that should be converted to a buffer
@@ -681,6 +693,9 @@ fn make_request_struct(
 
         _comment_!("Compiler time request size check");
         let _ = ::core::mem::transmute::<Request, [u8; $request_size]>;
+
+        // SAFETY: we checked the size before, so it should fit
+        unsafe impl $(imp_ipc_buffer_repr()) for Request {}
     };
 
     r
@@ -848,9 +863,13 @@ fn make_command_body(
             let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
         })
 
-        // TODO: write directly to IPC buffer
-        // TODO: check that it fits in IPC buffer
-        let request: Request = $(make_request(namespace, ctx, w_info));
+        // SAFETY: The pointer should be valid and has
+        unsafe {
+            ::core::ptr::write(
+                $(imp_get_ipc_buffer_for())(),
+                $(make_request(namespace, ctx, w_info))
+            )
+        };
 
         // TODO: process output
         $(if raw_data_out.is_empty() {

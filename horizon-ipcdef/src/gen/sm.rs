@@ -1,5 +1,6 @@
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
+use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
 use horizon_ipc::cmif::SessionHandle;
 use horizon_ipc::raw::cmif::CmifInHeader;
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
@@ -30,19 +31,25 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
-        let request: Request = Request {
-            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
-            special_header: HipcSpecialHeader::new(true, 0, 0),
-            pid_placeholder: 0,
-            pre_padding: Default::default(),
-            cmif: CmifInHeader {
-                magic: CmifInHeader::MAGIC,
-                version: 1,
-                command_id: 0,
-                token: 0,
-            },
-            raw_data: data_in,
-            post_padding: Default::default(),
+        unsafe impl IpcBufferRepr for Request {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    special_header: HipcSpecialHeader::new(true, 0, 0),
+                    pid_placeholder: 0,
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 0,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    post_padding: Default::default(),
+                },
+            )
         };
         todo!("Command codegen")
     }
@@ -58,17 +65,23 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        let request: Request = Request {
-            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
-            pre_padding: Default::default(),
-            cmif: CmifInHeader {
-                magic: CmifInHeader::MAGIC,
-                version: 1,
-                command_id: 1,
-                token: 0,
-            },
-            raw_data: data_in,
-            post_padding: Default::default(),
+        unsafe impl IpcBufferRepr for Request {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 1,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    post_padding: Default::default(),
+                },
+            )
         };
         todo!("Command codegen")
     }
@@ -101,17 +114,23 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
-        let request: Request = Request {
-            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
-            pre_padding: Default::default(),
-            cmif: CmifInHeader {
-                magic: CmifInHeader::MAGIC,
-                version: 1,
-                command_id: 2,
-                token: 0,
-            },
-            raw_data: data_in,
-            post_padding: Default::default(),
+        unsafe impl IpcBufferRepr for Request {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 2,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    post_padding: Default::default(),
+                },
+            )
         };
         todo!("Command codegen")
     }
@@ -128,18 +147,24 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
-        let request: Request = Request {
-            hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
-            special_header: HipcSpecialHeader::new(false, 0, 0),
-            pre_padding: Default::default(),
-            cmif: CmifInHeader {
-                magic: CmifInHeader::MAGIC,
-                version: 1,
-                command_id: 3,
-                token: 0,
-            },
-            raw_data: data_in,
-            post_padding: Default::default(),
+        unsafe impl IpcBufferRepr for Request {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
+                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 3,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    post_padding: Default::default(),
+                },
+            )
         };
         todo!("Command codegen")
     }
