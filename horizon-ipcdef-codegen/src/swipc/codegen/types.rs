@@ -217,15 +217,18 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
-                #![allow(clippy::all)]
+                #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                 /// This struct is marked with sf::LargeData
-                #[repr(C)]
+                #[repr(C, packed)]
                 pub struct HelloStruct {
                     pub aaaa: u8,
+                    pub _padding_0: [u8; 7],
                     pub padded: u64,
                     pub bbbb: u16,
+                    pub _padding_1: [u8; 2],
                     pub cccc: u32,
                     pub ddd: u8,
+                    pub _padding_2: [u8; 7],
                 }
                 // Static size check for HelloStruct (expect 32 bytes)
                 const _: fn() = || {
@@ -271,7 +274,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
-                #![allow(clippy::all)]
+                #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                 #[repr(u16)]
                 pub enum HelloEnum {
                     HelloArm = 1,
@@ -317,7 +320,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
-                #![allow(clippy::all)]
+                #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                 use bitflags::bitflags;
                 bitflags! {
                     pub struct HelloEnum : u8 { const Arm1 = 0x1; const Arm2 = 0x2; const Arm12 = 0x3; }
@@ -357,7 +360,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {"
-                #![allow(clippy::all)]
+                #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                 pub type HelloAlias = [u8; 4096];
             "}
         )

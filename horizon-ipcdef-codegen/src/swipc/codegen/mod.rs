@@ -261,17 +261,17 @@ mod tests {
             (
                 "mod.rs",
                 indoc! {"
-                    #![allow(clippy::all)]
+                    #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                     mod ns_1;
                     mod ns_2;
                     mod ns_3;
                 "},
             ),
             (
-                "ns_1/mod.rs",
+                "ns_1.rs",
                 indoc! {"
                     use super::ns_2::Enum1;
-                    #[repr(C)]
+                    #[repr(C, packed)]
                     pub struct Struct1 {
                         pub test: Enum1,
                     }
@@ -283,7 +283,7 @@ mod tests {
                 "},
             ),
             (
-                "ns_2/mod.rs",
+                "ns_2.rs",
                 indoc! {"
                     #[repr(u32)]
                     pub enum Enum1 {
@@ -301,7 +301,7 @@ mod tests {
                 "},
             ),
             (
-                "ns_3/nested/mod.rs",
+                "ns_3/nested.rs",
                 indoc! {"
                     use super::HelloAlias;
                     pub type HelloAlias2 = HelloAlias;

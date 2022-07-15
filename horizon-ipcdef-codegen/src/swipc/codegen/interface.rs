@@ -940,6 +940,7 @@ mod tests {
     use indoc::indoc;
     use itertools::Itertools;
 
+    #[ignore] // TODO: update when the codegen results for commands will be more or less stable
     #[test]
     fn simple_interface() {
         let s = r#"
@@ -974,7 +975,7 @@ mod tests {
         assert_eq!(
             res,
             indoc! {r#"
-                #![allow(clippy::all)]
+                #![allow(unreachable_code, unused_variables, non_upper_case_globals, clippy::all)]
                 use horizon_error::Result;
                 use horizon_ipc::cmif::SessionHandle;
                 pub struct IHelloInterface {
