@@ -9,10 +9,11 @@ pub enum StorageId {
     SdCard = 5,
     Any = 6,
 }
-#[repr(C)]
+#[repr(C, packed)]
 pub struct ProgramLocation {
     pub program_id: ProgramId,
     pub storage_id: StorageId,
+    pub _padding_0: [u8; 7],
 }
 // Static size check for ProgramLocation (expect 16 bytes)
 const _: fn() = || {

@@ -71,6 +71,12 @@ pub struct StructLayout {
     pub size: u64,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Padding {
+    pub offset: u64,
+    pub size: u64,
+}
+
 impl Struct {
     #[allow(unused_assignments)]
     pub fn fields_layout(&self, context: &CodegenContext) -> StructLayout {
@@ -133,6 +139,25 @@ impl Struct {
         let layout = self.fields_layout(context);
 
         TypeLayout::new(layout.size, layout.alignment)
+    }
+
+    pub fn paddings(&self, context: &CodegenContext) -> impl Iterator<Item = Padding> {
+        let mut offset = 0;
+
+        self.fields_layout(context)
+            .items
+            .into_iter()
+            .filter_map(move |i| match i {
+                FieldsLayoutItem::Field(size, _) => {
+                    offset += size;
+                    None
+                }
+                FieldsLayoutItem::Padding(size) => {
+                    let r = Padding { offset, size };
+                    offset += size;
+                    Some(r)
+                }
+            })
     }
 }
 

@@ -8,7 +8,7 @@ use horizon_ipc::raw::hipc::{
 };
 use super::ncm::{ProgramId, ProgramLocation};
 /// This struct is marked with sf::LargeData
-#[repr(C)]
+#[repr(C, packed)]
 pub struct ProgramInfo {
     pub main_thread_priority: u8,
     pub default_cpu_id: u8,
@@ -26,7 +26,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<ProgramInfo, [u8; 1024]>;
 };
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct PinId {
     pub value: u64,
 }
@@ -44,13 +44,18 @@ impl IProcessManagerInterface {
         flags: u32,
         reslimit_h: RawHandle,
     ) -> Result<RawHandle> {
-        #[repr(C)]
+        #[repr(C, packed)]
         struct In {
-            flags: u32,
-            id: PinId,
+            pub flags: u32,
+            pub _padding_0: [u8; 4],
+            pub id: PinId,
         }
         let _ = ::core::mem::transmute::<In, [u8; 16]>;
-        let data_in: In = In { flags, id };
+        let data_in: In = In {
+            flags,
+            id,
+            _padding_0: Default::default(),
+        };
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
@@ -94,7 +99,7 @@ impl IProcessManagerInterface {
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 65]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 72]>;
         let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 3, 0, true),
@@ -140,11 +145,6 @@ impl IProcessManagerInterface {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out_id: PinId,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 8]>;
         todo!("Command codegen")
     }
     pub fn unpin_program(id: PinId) -> Result<()> {

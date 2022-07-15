@@ -3,7 +3,7 @@ use horizon_ipc::RawHandle;
 use horizon_ipc::cmif::SessionHandle;
 use horizon_ipc::raw::cmif::CmifInHeader;
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
-#[repr(C)]
+#[repr(C, packed)]
 pub struct ServiceName {
     pub name: [u8; 8],
 }
@@ -77,14 +77,20 @@ impl IUserInterface {
         max_sessions: u32,
         is_light: bool,
     ) -> Result<RawHandle> {
-        #[repr(C)]
+        #[repr(C, packed)]
         struct In {
-            name: ServiceName,
-            is_light: bool,
-            max_sessions: u32,
+            pub name: ServiceName,
+            pub is_light: bool,
+            pub _padding_0: [u8; 3],
+            pub max_sessions: u32,
         }
         let _ = ::core::mem::transmute::<In, [u8; 16]>;
-        let data_in: In = In { name, is_light, max_sessions };
+        let data_in: In = In {
+            name,
+            is_light,
+            max_sessions,
+            _padding_0: Default::default(),
+        };
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,

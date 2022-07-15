@@ -1,8 +1,8 @@
-use crate::swipc::codegen::{import_in, make_ident};
-use crate::swipc::model::{Bitflags, Enum, IntType, Namespace, TypeAlias};
+use crate::swipc::util::PaddingHelper;
 use crate::swipc::{
-    codegen::{TokenStorage, Tokens},
-    model::{CodegenContext, NominalType, Struct},
+    codegen::{import_in, make_ident, TokenStorage, Tokens},
+    layout::FieldsLayoutItem,
+    model::{Bitflags, CodegenContext, Enum, IntType, Namespace, NominalType, Struct, TypeAlias},
 };
 use genco::prelude::*;
 
@@ -51,14 +51,24 @@ pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
         size
     );
 
+    let mut padding_helper = PaddingHelper::new();
+
     tok.push(
         namespace.clone(),
         quote! {
             $(if s.is_large_data { #[doc = " This struct is marked with sf::LargeData"] })
-            #[repr(C)]
+            #[repr(C, packed)]
             pub struct $name {
-                $(for f in s.fields.iter() {
-                    pub $(make_ident(&f.name)): $(make_nominal_type(namespace, &f.ty)),
+                $(for f in s.fields_layout(ctx).items.iter() {
+                    $(match f {
+                        &FieldsLayoutItem::Field(_, i) => {
+                            pub $(make_ident(&s.fields[i].name)):
+                                $(make_nominal_type(namespace, &s.fields[i].ty)),
+                        }
+                        &FieldsLayoutItem::Padding(size) => {
+                            pub $(padding_helper.next_padding_name()): [u8; $size],
+                        }
+                    })
                 })
             }
 

@@ -9,7 +9,7 @@ use horizon_ipc::raw::hipc::{
 };
 use super::account::Uid;
 use super::ncm::ProgramId;
-#[repr(C)]
+#[repr(C, packed)]
 pub struct FsSaveDataCreationInfo {
     pub save_data_size: i64,
     pub journal_size: i64,
@@ -25,7 +25,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataCreationInfo, [u8; 64]>;
 };
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct FsSaveDataAttribute {
     pub application_id: u64,
     pub uid: Uid,
@@ -43,7 +43,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataAttribute, [u8; 64]>;
 };
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct DirectoryEntry {
     pub path: [u8; 769],
     pub pad: [u8; 3],
@@ -121,7 +121,7 @@ impl IFileSystemProxy {
     }
 }
 /// This struct is marked with sf::LargeData
-#[repr(C)]
+#[repr(C, packed)]
 pub struct CodeVerificationData {
     pub signature: [u8; 256],
     pub target_hash: [u8; 32],
@@ -155,7 +155,7 @@ impl IFileSystemProxyForLoader {
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 61]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 68]>;
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 3, 0, false),
@@ -201,11 +201,6 @@ impl IFileSystemProxyForLoader {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out: bool,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 1]>;
         todo!("Command codegen")
     }
     pub fn set_current_process() -> Result<()> {
@@ -240,7 +235,7 @@ impl IFileSystemProxyForLoader {
     }
 }
 /// This struct is marked with sf::LargeData
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Path {
     pub str: [u8; 769],
 }
@@ -249,7 +244,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<Path, [u8; 769]>;
 };
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct FileTimeStampRaw {
     pub create: i64,
     pub modify: i64,
@@ -277,13 +272,18 @@ pub struct IFileSystem {
 }
 impl IFileSystem {
     pub fn create_file(path: &Path, size: i64, option: CreateOption) -> Result<()> {
-        #[repr(C)]
+        #[repr(C, packed)]
         struct In {
-            option: CreateOption,
-            size: i64,
+            pub option: CreateOption,
+            pub _padding_0: [u8; 4],
+            pub size: i64,
         }
         let _ = ::core::mem::transmute::<In, [u8; 16]>;
-        let data_in: In = In { option, size };
+        let data_in: In = In {
+            option,
+            size,
+            _padding_0: Default::default(),
+        };
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
@@ -524,11 +524,6 @@ impl IFileSystem {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out: u32,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 4]>;
         todo!("Command codegen")
     }
     pub fn open_file(path: &Path, mode: u32) -> Result<IFile> {
@@ -643,11 +638,6 @@ impl IFileSystem {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out: i64,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 8]>;
         todo!("Command codegen")
     }
     pub fn get_total_space_size(path: &Path) -> Result<i64> {
@@ -678,11 +668,6 @@ impl IFileSystem {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out: i64,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 8]>;
         todo!("Command codegen")
     }
     pub fn clean_directory_recursively(path: &Path) -> Result<()> {
@@ -743,11 +728,6 @@ impl IFileSystem {
             raw_data: data_in,
             post_padding: Default::default(),
         };
-        #[repr(C)]
-        struct Out {
-            out: FileTimeStampRaw,
-        }
-        let _ = ::core::mem::transmute::<Out, [u8; 32]>;
         todo!("Command codegen")
     }
     pub fn query_entry(

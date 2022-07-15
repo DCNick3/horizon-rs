@@ -1,10 +1,12 @@
 use crate::swipc::codegen::types::make_nominal_type;
 use crate::swipc::codegen::{import_in, make_ident, TokenStorage};
 use crate::swipc::diagnostics::Span;
+use crate::swipc::layout::FieldsLayoutItem;
 use crate::swipc::model::{
     BufferExtraAttrs, BufferTransferMode, CodegenContext, Command, Direction, HandleTransferType,
     IntType, Interface, Namespace, NamespacedIdent, NominalType, Struct, StructField, Value,
 };
+use crate::swipc::util::PaddingHelper;
 use arcstr::ArcStr;
 use convert_case::{Case, Casing};
 use genco::lang::rust::Tokens;
@@ -488,21 +490,29 @@ fn make_raw_data_struct(
     namespace: &Namespace,
     ctx: &CodegenContext,
     direction: Direction,
-    items: impl Iterator<Item = (ArcStr, NominalType)>,
+    s: &Struct,
 ) -> Tokens {
     let name = NamespacedIdent::new(namespace.clone(), ArcStr::from(format!("{:?}", direction)));
-
-    let s = raw_data_struct(items);
 
     let size = s.layout(ctx).size();
 
     let name = name.ident().as_str();
 
+    let mut padding_helper = PaddingHelper::new();
+
     quote! {
-        #[repr(C)]
+        #[repr(C, packed)]
         struct $name {
-            $(for field in s.fields join (,) {
-                $(field.name.as_str()): $(make_nominal_type(namespace, &field.ty))
+            $(for f in s.fields_layout(ctx).items {
+                $(match f {
+                    FieldsLayoutItem::Field(_, i) => {
+                        pub $(make_ident(&s.fields[i].name)):
+                            $(make_nominal_type(namespace, &s.fields[i].ty)),
+                    }
+                    FieldsLayoutItem::Padding(size) => {
+                        pub $(padding_helper.next_padding_name()): [u8; $size],
+                    }
+                })
             })
         }
 
@@ -535,6 +545,8 @@ fn make_raw_data_in_type(
 }
 
 fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawDataIn]) -> Tokens {
+    let s = raw_data_struct(data.iter().map(|d| (d.name.clone(), d.ty.clone())));
+
     if data.is_empty() {
         (quote! {
             let data_in = ();
@@ -550,25 +562,29 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
             });
         }
     } else {
+        let mut padding_helper = PaddingHelper::new();
+
         quote! {
             $(make_raw_data_struct(
                 namespace,
                 ctx,
                 Direction::In,
-                data
-                    .iter()
-                    .map(|d| (d.name.clone(), d.ty.clone()))
+                &s
             ))
 
             let data_in: In = In {
-                $(for data in data join (,) {
+                $(for data in data {
                     $(match data.source {
                         RawDataInSource::PidPlaceholder =>
                             $(data.name.as_str()): 0,
 
                         RawDataInSource::Local =>
                             $(data.name.as_str()),
-                    })
+                    }),
+                })
+
+                $(for padding in s.paddings(ctx) {
+                    $(padding_helper.next_padding_name()): Default::default(),
                 })
             };
         }
@@ -612,11 +628,11 @@ fn make_request_struct(
         w_info.in_raw_data_struct().layout(ctx).size() as usize +
         out_pointer_buffers.len() * 2 + // OutPointer lengths as a u16 array
         if out_pointer_buffers.len() % 2 != 0 { // padding for OutPointer length array
-            1
+            2
         } else  {
             0
         } +
-        out_pointer_buffers.len() * 2; // descriptors
+        out_pointer_buffers.len() * 8; // descriptors
 
     if request_size > 0x100 {
         panic!("Request struct is too large, would not fit into the IPC command buffer")
@@ -839,14 +855,14 @@ fn make_command_body(
         // TODO: process output
         $(if raw_data_out.is_empty() {
         } else {
-            $(make_raw_data_struct(
-                namespace,
-                ctx,
-                Direction::Out,
-                raw_data_out
-                    .iter()
-                    .map(|d| (d.name.clone(), d.ty.clone()))
-            ))
+            // $(make_raw_data_struct(
+            //     namespace,
+            //     ctx,
+            //     Direction::Out,
+            //     raw_data_out
+            //         .iter()
+            //         .map(|d| (d.name.clone(), d.ty.clone()))
+            // ))
         })
 
         todo!("Command codegen")
