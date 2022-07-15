@@ -61,6 +61,8 @@ impl IProcessManagerInterface {
             raw_data: In,
             post_padding: [u8; 16],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 64]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 1, 0),
@@ -87,8 +89,13 @@ impl IProcessManagerInterface {
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
             post_padding: [u8; 12],
+            out_pointer_size_0: u16,
+            out_pointer_size_padding: u16,
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 65]>;
+        let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 3, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -101,9 +108,10 @@ impl IProcessManagerInterface {
             },
             raw_data: data_in,
             post_padding: Default::default(),
+            out_pointer_size_0: ::core::mem::size_of_val(&out_program_info) as u16,
+            out_pointer_size_padding: 0,
             out_pointer_desc_0: todo!(),
         };
-        let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
         todo!("Command codegen")
     }
     pub fn pin_program(loc: ProgramLocation) -> Result<PinId> {
@@ -117,6 +125,8 @@ impl IProcessManagerInterface {
             raw_data: ProgramLocation,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -148,6 +158,8 @@ impl IProcessManagerInterface {
             raw_data: PinId,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -174,6 +186,8 @@ impl IProcessManagerInterface {
             raw_data: bool,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 45]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),

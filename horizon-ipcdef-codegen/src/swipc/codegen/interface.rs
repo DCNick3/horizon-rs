@@ -201,6 +201,14 @@ impl CommandWireFormatInfo {
             .filter(|h| h.transfer_type == HandleTransferType::Move)
             .count()
     }
+
+    pub fn in_raw_data_struct(&self) -> Struct {
+        raw_data_struct(
+            self.raw_data_in
+                .iter()
+                .map(|d| (d.name.clone(), d.ty.clone())),
+        )
+    }
 }
 
 fn collect_command_info(
@@ -277,7 +285,7 @@ fn collect_command_info(
                 if is_large_data {
                     uninit_vars.push((name.clone(), quote!($ty_tok)));
                     buffers.push(Buffer {
-                        source: BufferSource::TypedReference(name.clone()),
+                        source: BufferSource::TypedUninitVariable(name.clone()),
                         direction: Direction::Out,
                         transfer_mode: struct_ty.preferred_transfer_mode(),
                         extra_attrs: BufferExtraAttrs::None,
@@ -594,9 +602,25 @@ fn make_request_struct(
                 (should_pass_pid as usize) * 2 +
                 handles_in.len()
         } else { 0 } +
-        in_pointer_buffers.len() * 2 +
-        in_map_aliases.len() * 3 +
-        out_map_aliases.len() * 3;
+        in_pointer_buffers.len() * 2 + // descriptors
+        in_map_aliases.len() * 3 + // descriptors
+        out_map_aliases.len() * 3; // descriptors
+
+    let request_size = cmif_header_offset * 4 +
+        16 + // padding
+        16 + // CMIF header
+        w_info.in_raw_data_struct().layout(ctx).size() as usize +
+        out_pointer_buffers.len() * 2 + // OutPointer lengths as a u16 array
+        if out_pointer_buffers.len() % 2 != 0 { // padding for OutPointer length array
+            1
+        } else  {
+            0
+        } +
+        out_pointer_buffers.len() * 2; // descriptors
+
+    if request_size > 0x100 {
+        panic!("Request struct is too large, would not fit into the IPC command buffer")
+    }
 
     // use the offset to calculate cmif padding size
     let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
@@ -626,16 +650,42 @@ fn make_request_struct(
             cmif: $(imp_cmif_in_header()),
             raw_data: $(make_raw_data_in_type(namespace, ctx, &w_info.raw_data_in)),
             post_padding: [u8; $(16 - pre_cmif_padding)],
-            // TODO: pointer buffer sizes, I think?
+            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+                $(format!("out_pointer_size_{}", i)): u16,
+            })
+            $(if out_pointer_buffers.len() % 2 != 0 {
+                out_pointer_size_padding: u16,
+            })
 
 
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
                 $(format!("out_pointer_desc_{}", i)): $(imp_out_pointer_desc()),
             })
         }
+
+        _comment_!("Compiler time request size check");
+        let _ = ::core::mem::transmute::<Request, [u8; $request_size]>;
     };
 
     r
+}
+
+fn make_buffer_size(buffer: &Buffer) -> Tokens {
+    (match &buffer.source {
+        BufferSource::TypedUninitVariable(name) => {
+            quote! {
+                ::core::mem::size_of_val(&$(name.as_str())) as u16
+            }
+        }
+
+        BufferSource::TypedReference(name)
+        | BufferSource::TypedSlice(name)
+        | BufferSource::ByteSlice(name) => {
+            quote! {
+                ::core::mem::size_of_val($(name.as_str())) as u16
+            }
+        }
+    }) as Tokens
 }
 
 fn make_request(
@@ -727,6 +777,13 @@ fn make_request(
             post_padding: Default::default(),
 
             $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+                $(format!("out_pointer_size_{}", i)): $(make_buffer_size(b)),
+            })
+            $(if out_pointer_buffers.len() % 2 != 0 {
+                out_pointer_size_padding: 0,
+            })
+
+            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
                 $(format!("out_pointer_desc_{}", i)): todo!(),
             })
         }
@@ -771,6 +828,10 @@ fn make_command_body(
 
         $(make_request_struct(namespace, ctx, w_info))
 
+        $(for (name, ty) in uninit_vars {
+            let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
+        })
+
         // TODO: write directly to IPC buffer
         // TODO: check that it fits in IPC buffer
         let request: Request = $(make_request(namespace, ctx, w_info));
@@ -786,10 +847,6 @@ fn make_command_body(
                     .iter()
                     .map(|d| (d.name.clone(), d.ty.clone()))
             ))
-        })
-
-        $(for (name, ty) in uninit_vars {
-            let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
         })
 
         todo!("Command codegen")

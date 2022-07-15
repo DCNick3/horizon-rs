@@ -28,6 +28,8 @@ impl IUserInterface {
             raw_data: u64,
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(true, 0, 0),
@@ -54,6 +56,8 @@ impl IUserInterface {
             raw_data: ServiceName,
             post_padding: [u8; 8],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
             pre_padding: Default::default(),
@@ -89,6 +93,8 @@ impl IUserInterface {
             raw_data: In,
             post_padding: [u8; 8],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 56]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
             pre_padding: Default::default(),
@@ -114,6 +120,8 @@ impl IUserInterface {
             raw_data: ServiceName,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),

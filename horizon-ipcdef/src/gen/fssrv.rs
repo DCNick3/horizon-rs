@@ -103,6 +103,8 @@ impl IFileSystemProxy {
             raw_data: (),
             post_padding: [u8; 8],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 40]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, false),
             pre_padding: Default::default(),
@@ -148,8 +150,13 @@ impl IFileSystemProxyForLoader {
             cmif: CmifInHeader,
             raw_data: ProgramId,
             post_padding: [u8; 16],
+            out_pointer_size_0: u16,
+            out_pointer_size_padding: u16,
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 61]>;
+        let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 3, 0, false),
             in_pointer_desc_0: todo!(),
@@ -162,9 +169,10 @@ impl IFileSystemProxyForLoader {
             },
             raw_data: data_in,
             post_padding: Default::default(),
+            out_pointer_size_0: ::core::mem::size_of_val(&out_verif) as u16,
+            out_pointer_size_padding: 0,
             out_pointer_desc_0: todo!(),
         };
-        let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         todo!("Command codegen")
     }
     pub fn is_archived_program(process_id: u64) -> Result<bool> {
@@ -178,6 +186,8 @@ impl IFileSystemProxyForLoader {
             raw_data: u64,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -210,6 +220,8 @@ impl IFileSystemProxyForLoader {
             raw_data: u64,
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(true, 0, 0),
@@ -282,6 +294,8 @@ impl IFileSystem {
             raw_data: In,
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 68]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -310,6 +324,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -338,6 +354,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -366,6 +384,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -394,6 +414,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -423,6 +445,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 2, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -453,6 +477,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 2, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -482,6 +508,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -514,6 +542,8 @@ impl IFileSystem {
             raw_data: u32,
             post_padding: [u8; 16],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, false),
             in_pointer_desc_0: todo!(),
@@ -540,6 +570,8 @@ impl IFileSystem {
             raw_data: u32,
             post_padding: [u8; 16],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, false),
             in_pointer_desc_0: todo!(),
@@ -566,6 +598,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 44]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 0, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -593,6 +627,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -626,6 +662,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -659,6 +697,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -687,6 +727,8 @@ impl IFileSystem {
             raw_data: (),
             post_padding: [u8; 4],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 0, 0, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),
@@ -727,6 +769,8 @@ impl IFileSystem {
             raw_data: QueryId,
             post_padding: [u8; 12],
         }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 80]>;
         let request: Request = Request {
             hipc: HipcHeader::new(4, 1, 1, 1, 0, 0, 0, 0, true),
             special_header: HipcSpecialHeader::new(false, 0, 0),

@@ -9,6 +9,7 @@ use genco::fmt::Indentation;
 use genco::lang::rust::Tokens;
 use genco::lang::{rust, Rust};
 use genco::quote;
+use indoc::indoc;
 use itertools::Itertools;
 use rust_format::{Formatter, PostProcess};
 use sequence_trie::SequenceTrie;
@@ -179,7 +180,14 @@ impl TokenStorage {
                     //   and it's a no-no for module-level attributes
                     // TODO: report to genco
                     format!(
-                        "#![allow(non_upper_case_globals, clippy::all)]\n{}",
+                        indoc! {r"
+                            #![allow(
+                                unreachable_code,       // temporary for codegen debug
+                                unused_variables,       // temporary for codegen debug
+                                non_upper_case_globals, // forever, because we use PascalCase for bitfield arms
+                                clippy::all,            // probably forever
+                            )]
+                            {}"},
                         contents
                     )
                 } else {
