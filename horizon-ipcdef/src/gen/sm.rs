@@ -17,7 +17,7 @@ pub struct IUserInterface {
     pub(crate) handle: SessionHandle,
 }
 impl IUserInterface {
-    pub fn initialize() -> Result<()> {
+    pub fn initialize(&self) -> Result<()> {
         let data_in = 0u64;
         #[repr(packed)]
         struct Request {
@@ -51,9 +51,10 @@ impl IUserInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_service(name: ServiceName) -> Result<RawHandle> {
+    pub fn get_service(&self, name: ServiceName) -> Result<RawHandle> {
         let data_in = name;
         #[repr(packed)]
         struct Request {
@@ -83,9 +84,11 @@ impl IUserInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
     pub fn register_service(
+        &self,
         name: ServiceName,
         max_sessions: u32,
         is_light: bool,
@@ -132,9 +135,10 @@ impl IUserInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn unregister_service(name: ServiceName) -> Result<()> {
+    pub fn unregister_service(&self, name: ServiceName) -> Result<()> {
         let data_in = name;
         #[repr(packed)]
         struct Request {
@@ -166,6 +170,7 @@ impl IUserInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
 }

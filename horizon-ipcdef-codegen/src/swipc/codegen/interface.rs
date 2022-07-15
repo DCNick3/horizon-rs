@@ -894,6 +894,8 @@ fn make_command_body(
             // ))
         })
 
+        horizon_svc::send_sync_request(self.handle.0)?;
+
         todo!("Command codegen")
     };
 
@@ -924,6 +926,7 @@ fn gen_command_in(
     let name = c.name.to_case(Case::Snake);
     quote_in! { *tok =>
         pub fn $name(
+            &self,
             $(for (name, ty) in &i_info.args join (,) => $(name.as_str()): $ty)
         ) -> $(imp_result())<$return_type> {
             $(make_command_body(namespace, ctx, &i_info, &w_info))

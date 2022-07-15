@@ -41,6 +41,7 @@ pub struct IProcessManagerInterface {
 }
 impl IProcessManagerInterface {
     pub fn create_process(
+        &self,
         id: PinId,
         flags: u32,
         reslimit_h: RawHandle,
@@ -89,9 +90,10 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_program_info(loc: ProgramLocation) -> Result<ProgramInfo> {
+    pub fn get_program_info(&self, loc: ProgramLocation) -> Result<ProgramInfo> {
         let data_in = loc;
         #[repr(packed)]
         struct Request {
@@ -126,9 +128,10 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn pin_program(loc: ProgramLocation) -> Result<PinId> {
+    pub fn pin_program(&self, loc: ProgramLocation) -> Result<PinId> {
         let data_in = loc;
         #[repr(packed)]
         struct Request {
@@ -160,9 +163,10 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn unpin_program(id: PinId) -> Result<()> {
+    pub fn unpin_program(&self, id: PinId) -> Result<()> {
         let data_in = id;
         #[repr(packed)]
         struct Request {
@@ -194,9 +198,10 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn set_enabled_program_verification(enabled: bool) -> Result<()> {
+    pub fn set_enabled_program_verification(&self, enabled: bool) -> Result<()> {
         let data_in = enabled;
         #[repr(packed)]
         struct Request {
@@ -228,6 +233,7 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
 }

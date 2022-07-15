@@ -94,7 +94,7 @@ pub struct IFileSystemProxy {
     pub(crate) handle: SessionHandle,
 }
 impl IFileSystemProxy {
-    pub fn open_sd_card_file_system() -> Result<IFileSystem> {
+    pub fn open_sd_card_file_system(&self) -> Result<IFileSystem> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -124,6 +124,7 @@ impl IFileSystemProxy {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
 }
@@ -145,6 +146,7 @@ pub struct IFileSystemProxyForLoader {
 }
 impl IFileSystemProxyForLoader {
     pub fn open_code_file_system(
+        &self,
         path: &Path,
         program_id: ProgramId,
     ) -> Result<(IFileSystem, CodeVerificationData)> {
@@ -182,9 +184,10 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn is_archived_program(process_id: u64) -> Result<bool> {
+    pub fn is_archived_program(&self, process_id: u64) -> Result<bool> {
         let data_in = process_id;
         #[repr(packed)]
         struct Request {
@@ -216,9 +219,10 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn set_current_process() -> Result<()> {
+    pub fn set_current_process(&self) -> Result<()> {
         let data_in = 0u64;
         #[repr(packed)]
         struct Request {
@@ -252,6 +256,7 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
 }
@@ -292,7 +297,12 @@ pub struct IFileSystem {
     pub(crate) handle: SessionHandle,
 }
 impl IFileSystem {
-    pub fn create_file(path: &Path, size: i64, option: CreateOption) -> Result<()> {
+    pub fn create_file(
+        &self,
+        path: &Path,
+        size: i64,
+        option: CreateOption,
+    ) -> Result<()> {
         #[repr(C, packed)]
         struct In {
             pub option: CreateOption,
@@ -337,9 +347,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn delete_file(path: &Path) -> Result<()> {
+    pub fn delete_file(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -373,9 +384,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn create_directory(path: &Path) -> Result<()> {
+    pub fn create_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -409,9 +421,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn delete_directory(path: &Path) -> Result<()> {
+    pub fn delete_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -445,9 +458,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn delete_directory_recursively(path: &Path) -> Result<()> {
+    pub fn delete_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -481,9 +495,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn rename_file(old_path: &Path, new_path: &Path) -> Result<()> {
+    pub fn rename_file(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -519,9 +534,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn rename_directory(old_path: &Path, new_path: &Path) -> Result<()> {
+    pub fn rename_directory(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -557,9 +573,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_entry_type(path: &Path) -> Result<u32> {
+    pub fn get_entry_type(&self, path: &Path) -> Result<u32> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -593,9 +610,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn open_file(path: &Path, mode: u32) -> Result<IFile> {
+    pub fn open_file(&self, path: &Path, mode: u32) -> Result<IFile> {
         let data_in = mode;
         #[repr(packed)]
         struct Request {
@@ -627,9 +645,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn open_directory(path: &Path, mode: u32) -> Result<IDirectory> {
+    pub fn open_directory(&self, path: &Path, mode: u32) -> Result<IDirectory> {
         let data_in = mode;
         #[repr(packed)]
         struct Request {
@@ -661,9 +680,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn commit() -> Result<()> {
+    pub fn commit(&self) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -695,9 +715,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_free_space_size(path: &Path) -> Result<i64> {
+    pub fn get_free_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -731,9 +752,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_total_space_size(path: &Path) -> Result<i64> {
+    pub fn get_total_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -767,9 +789,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn clean_directory_recursively(path: &Path) -> Result<()> {
+    pub fn clean_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -803,9 +826,10 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
-    pub fn get_file_time_stamp_raw(path: &Path) -> Result<FileTimeStampRaw> {
+    pub fn get_file_time_stamp_raw(&self, path: &Path) -> Result<FileTimeStampRaw> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -839,9 +863,11 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
     pub fn query_entry(
+        &self,
         out_buf: &mut [u8],
         in_buf: &[u8],
         query_id: QueryId,
@@ -884,6 +910,7 @@ impl IFileSystem {
                 },
             )
         };
+        horizon_svc::send_sync_request(self.handle.0)?;
         todo!("Command codegen")
     }
 }
