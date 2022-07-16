@@ -1,6 +1,6 @@
 #![allow(unused_qualifications)]
 use core::mem::MaybeUninit;
-use horizon_error::Result;
+use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
@@ -126,6 +126,15 @@ impl IProcessManagerInterface {
             raw_data: (),
             ..
         } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -136,7 +145,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| proc_h)
+        Ok(proc_h)
     }
 
     pub fn get_program_info(&self, loc: ProgramLocation) -> Result<ProgramInfo> {
@@ -201,6 +210,9 @@ impl IProcessManagerInterface {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 1);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -209,7 +221,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out_program_info = unsafe { out_program_info.assume_init() };
-        cmif.result.into_result_with(|| out_program_info)
+        Ok(out_program_info)
     }
 
     pub fn pin_program(&self, loc: ProgramLocation) -> Result<PinId> {
@@ -261,6 +273,9 @@ impl IProcessManagerInterface {
         let Response { hipc, cmif, raw_data: out_id, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -268,7 +283,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out_id)
+        Ok(out_id)
     }
 
     pub fn unpin_program(&self, id: PinId) -> Result<()> {
@@ -326,6 +341,9 @@ impl IProcessManagerInterface {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -333,7 +351,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn set_enabled_program_verification(&self, enabled: bool) -> Result<()> {
@@ -391,6 +409,9 @@ impl IProcessManagerInterface {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -398,7 +419,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 }
 impl From<RawHandle> for IProcessManagerInterface {

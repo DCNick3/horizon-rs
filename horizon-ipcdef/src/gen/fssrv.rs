@@ -1,7 +1,7 @@
 #![allow(unused_qualifications)]
 use bitflags::bitflags;
 use core::mem::MaybeUninit;
-use horizon_error::Result;
+use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
@@ -160,6 +160,15 @@ impl IFileSystemProxy {
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -173,7 +182,7 @@ impl IFileSystemProxy {
         let out = IFileSystem {
             handle: SessionHandle(out),
         };
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 }
 impl From<RawHandle> for IFileSystemProxy {
@@ -279,6 +288,15 @@ impl IFileSystemProxyForLoader {
             raw_data: (),
             ..
         } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 1);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -293,7 +311,7 @@ impl IFileSystemProxyForLoader {
         let out_fs = IFileSystem {
             handle: SessionHandle(out_fs),
         };
-        cmif.result.into_result_with(|| (out_fs, out_verif))
+        Ok((out_fs, out_verif))
     }
 
     pub fn is_archived_program(&self, process_id: u64) -> Result<bool> {
@@ -351,6 +369,9 @@ impl IFileSystemProxyForLoader {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -358,7 +379,7 @@ impl IFileSystemProxyForLoader {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn set_current_process(&self) -> Result<()> {
@@ -420,6 +441,9 @@ impl IFileSystemProxyForLoader {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -427,7 +451,7 @@ impl IFileSystemProxyForLoader {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 }
 impl From<RawHandle> for IFileSystemProxyForLoader {
@@ -551,6 +575,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -558,7 +585,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn delete_file(&self, path: &Path) -> Result<()> {
@@ -616,6 +643,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -623,7 +653,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn create_directory(&self, path: &Path) -> Result<()> {
@@ -681,6 +711,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -688,7 +721,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn delete_directory(&self, path: &Path) -> Result<()> {
@@ -746,6 +779,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -753,7 +789,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn delete_directory_recursively(&self, path: &Path) -> Result<()> {
@@ -817,6 +853,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -824,7 +863,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn rename_file(&self, old_path: &Path, new_path: &Path) -> Result<()> {
@@ -888,6 +927,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -895,7 +937,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn rename_directory(&self, old_path: &Path, new_path: &Path) -> Result<()> {
@@ -959,6 +1001,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -966,7 +1011,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn get_entry_type(&self, path: &Path) -> Result<u32> {
@@ -1024,6 +1069,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1031,7 +1079,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn open_file(&self, path: &Path, mode: u32) -> Result<IFile> {
@@ -1091,6 +1139,15 @@ impl IFileSystem {
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1104,7 +1161,7 @@ impl IFileSystem {
         let out = IFile {
             handle: SessionHandle(out),
         };
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn open_directory(
@@ -1168,6 +1225,15 @@ impl IFileSystem {
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1181,7 +1247,7 @@ impl IFileSystem {
         let out = IDirectory {
             handle: SessionHandle(out),
         };
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn commit(&self) -> Result<()> {
@@ -1233,6 +1299,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1240,7 +1309,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn get_free_space_size(&self, path: &Path) -> Result<i64> {
@@ -1298,6 +1367,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1305,7 +1377,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn get_total_space_size(&self, path: &Path) -> Result<i64> {
@@ -1363,6 +1435,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1370,7 +1445,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn clean_directory_recursively(&self, path: &Path) -> Result<()> {
@@ -1434,6 +1509,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1441,7 +1519,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn get_file_time_stamp_raw(&self, path: &Path) -> Result<FileTimeStampRaw> {
@@ -1499,6 +1577,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1506,7 +1587,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn query_entry(
@@ -1582,6 +1663,9 @@ impl IFileSystem {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1589,7 +1673,7 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 }
 impl From<RawHandle> for IFileSystem {
@@ -1667,6 +1751,9 @@ impl IDirectory {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1674,7 +1761,7 @@ impl IDirectory {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 
     pub fn get_entry_count(&self) -> Result<i64> {
@@ -1726,6 +1813,9 @@ impl IDirectory {
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -1733,7 +1823,7 @@ impl IDirectory {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| out)
+        Ok(out)
     }
 }
 impl From<RawHandle> for IDirectory {

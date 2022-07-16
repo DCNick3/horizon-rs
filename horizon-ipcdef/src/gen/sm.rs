@@ -1,5 +1,5 @@
 #![allow(unused_qualifications)]
-use horizon_error::Result;
+use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
@@ -72,6 +72,9 @@ impl IUserInterface {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -79,7 +82,7 @@ impl IUserInterface {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 
     pub fn get_service(&self, name: ServiceName) -> Result<RawHandle> {
@@ -138,6 +141,15 @@ impl IUserInterface {
             raw_data: (),
             ..
         } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -148,7 +160,7 @@ impl IUserInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| session_handle)
+        Ok(session_handle)
     }
 
     pub fn register_service(
@@ -225,6 +237,15 @@ impl IUserInterface {
             raw_data: (),
             ..
         } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
+        if hipc.has_special_header() != 0 {
+            if cmif.result.is_failure() {
+                return Err(cmif.result);
+            }
+        } else {
+            return Err(unsafe {
+                ::core::ptr::read(ipc_buffer_ptr.offset(24) as *const ErrorCode)
+            })
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -235,7 +256,7 @@ impl IUserInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| port_handle)
+        Ok(port_handle)
     }
 
     pub fn unregister_service(&self, name: ServiceName) -> Result<()> {
@@ -287,6 +308,9 @@ impl IUserInterface {
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -294,7 +318,7 @@ impl IUserInterface {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 0);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
-        cmif.result.into_result_with(|| ())
+        Ok(())
     }
 }
 impl From<RawHandle> for IUserInterface {

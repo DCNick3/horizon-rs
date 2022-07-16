@@ -17,7 +17,7 @@ const MODULE_MASK: u32 = !(!0 << MODULE_BITS);
 /// this mask is not shifted!
 const DESCRIPTION_MASK: u32 = !(!0 << DESCRIPTION_BITS);
 
-/// Represents a horizon code, also known as ErrorCode in other parts of the ecosystem
+/// Represents a horizon error code, also known as Result Code in other parts of the ecosystem
 #[derive(Copy, Clone, PartialEq, Eq, Default)]
 #[repr(transparent)]
 pub struct ErrorCode {
@@ -123,7 +123,7 @@ impl Debug for ErrorCode {
         let module = self.get_module();
         let desc = self.get_description();
 
-        write!(f, "{:4}-{:4}", module + 2000, desc)
+        write!(f, "{:04}-{:04}", module + 2000, desc)
     }
 }
 

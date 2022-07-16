@@ -29,6 +29,12 @@ fn imp_session_handle() -> Tokens {
     quote!($imp)
 }
 
+fn imp_error_code() -> Tokens {
+    let imp = rust::import("horizon_error", "ErrorCode");
+
+    quote!($imp)
+}
+
 fn imp_result() -> Tokens {
     let imp = rust::import("horizon_error", "Result");
 
@@ -738,6 +744,7 @@ struct ResponseSizes {
     cmif_header_offset: usize,
     data_size: usize,
     response_size: usize,
+    cmif_alternative_result_offset: usize,
 }
 
 fn response_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> ResponseSizes {
@@ -756,6 +763,15 @@ fn response_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Respo
         } else { 0 } +
         out_pointer_buffers.len() * 8; // descriptors (would be in_pointer)
 
+    // offset to result in case no handles are sent
+    let cmif_alternative_header_offset = 8 + // HIPC header
+        out_pointer_buffers.len() * 8;
+
+    // align up to 16 bytes
+    let cmif_alternative_header_offset =
+        cmif_alternative_header_offset + (16 - cmif_alternative_header_offset % 16) % 16;
+    let cmif_alternative_result_offset = cmif_alternative_header_offset + 8;
+
     let raw_data_size = w_info.out_raw_data_struct().layout(ctx).size();
 
     let data_size = 16 + // padding
@@ -769,6 +785,7 @@ fn response_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Respo
         cmif_header_offset,
         data_size,
         response_size,
+        cmif_alternative_result_offset,
     }
 }
 
@@ -878,6 +895,7 @@ fn make_response_struct(
         cmif_header_offset,
         data_size,
         response_size,
+        ..
     } = response_sizes(ctx, w_info);
 
     if response_size > 0x100 {
@@ -964,11 +982,49 @@ fn make_response_pattern(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -
     } as Tokens)
 }
 
+fn make_error_return(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
+    // well, this is embarrassing
+    // when returning an error, the server will not send us handles that it usually will,
+    //  so it would change the layout and potentially shift the CMIF header,
+    //  rendering the error code usually read incorrect
+    // This is why a clever solution is used: if there is no special header where it should be,
+    //  we assume that an error happened and read the error code at fixed offset to return it early
+
+    let ResponseSizes {
+        cmif_alternative_result_offset,
+        ..
+    } = response_sizes(ctx, w_info);
+
+    (quote! {
+        $(if !w_info.has_out_special_header() {
+            if cmif.result.is_failure() {
+                return Err(cmif.result)
+            }
+        } else {
+            if hipc.has_special_header() != 0 {
+                if cmif.result.is_failure() {
+                    return Err(cmif.result)
+                }
+            } else {
+                return Err(
+                    unsafe {
+                        ::core::ptr::read(
+                            ipc_buffer_ptr.offset($cmif_alternative_result_offset)
+                                as *const $(imp_error_code())
+                        )
+                    }
+                )
+            }
+        })
+    } as Tokens)
+}
+
 fn make_check_response(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
     let ResponseSizes {
         cmif_header_offset,
         data_size,
         response_size,
+        ..
     } = response_sizes(ctx, w_info);
 
     let num_in_pointers = w_info.out_pointer_buffers().len();
@@ -1289,6 +1345,7 @@ fn make_command_body(
                 )
             };
 
+        $(make_error_return(ctx, w_info))
         $(make_check_response(ctx, w_info))
 
         $(for (name, _) in uninit_vars {
@@ -1307,7 +1364,7 @@ fn make_command_body(
             })
         })
 
-        cmif.result.into_result_with(||
+        Ok(
             $(if results.is_empty() {
                 ()
             } else {

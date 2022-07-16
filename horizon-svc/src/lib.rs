@@ -204,6 +204,7 @@ pub unsafe fn connect_to_named_port(port_name: &[u8]) -> Result<RawHandle> {
     r.result.into_result(RawHandle(r.session_handle))
 }
 
+#[inline]
 pub fn send_sync_request(session_handle: RawHandle) -> Result<()> {
     unsafe { raw::send_sync_request(session_handle.0) }
         .result
