@@ -18,8 +18,8 @@ extern {
 }
 
 Num: u64 = {
-    <s:r"[0-9]+"> => u64::from_str(s).unwrap(),
-    <s:r"0x[0-9a-fA-F]+"> => u64::from_str_radix(&s[2..], 16).unwrap()
+    <s:r"\d+"> => u64::from_str(s).unwrap(),
+    <s:r"0x[\da-fA-F]+"> => u64::from_str_radix(&s[2..], 16).unwrap()
 };
 
 Comma<T>: Vec<T> = {
@@ -93,7 +93,7 @@ pub StructDef: Struct =
         <fields:(<StructField>)*>
         // Allow docs here because.... Reasons (need for test readability, lol)
         Docs
-    "}" ";"
+    "}"
     <r:@R> =>? Struct::try_new(
                 name,
                 fields,
@@ -121,7 +121,7 @@ pub EnumDef: Enum =
     Docs
     "enum" <name:NamespacedIdent> ":" <base_type:IntType> "{"
         <arms:Comma<EnumArm>>
-    "}" ";"
+    "}"
     <r:@R> => Enum {
         name,
         base_type,
@@ -144,7 +144,7 @@ pub BitflagsDef: Bitflags =
     Docs
     "bitflags" <name:NamespacedIdent> ":" <base_type:IntType> "{"
         <arms:Comma<BitflagsArm>>
-    "}" ";"
+    "}"
     <r:@R> => Bitflags {
         name,
         base_type,

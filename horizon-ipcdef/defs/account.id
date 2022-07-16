@@ -1,4 +1,4 @@
 struct account::Uid {
     u64 uid_part_1;
     u64 uid_part_2;
-};
+}

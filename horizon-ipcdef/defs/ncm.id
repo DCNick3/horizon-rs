@@ -8,9 +8,9 @@ enum ncm::StorageId : u8 {
     BuiltInUser     = 4,
     SdCard          = 5,
     Any             = 6,
-};
+}
 
 struct ncm::ProgramLocation {
     ncm::ProgramId program_id;
     ncm::StorageId storage_id;
-};
+}

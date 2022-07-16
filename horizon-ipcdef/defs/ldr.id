@@ -10,11 +10,11 @@ struct ldr::ProgramInfo : sf::LargeData {
     u32 acid_fac_size;
     u32 aci_fah_size;
     sf::Bytes<0x3E0> ac_buffer;
-};
+}
 
 struct ldr::PinId {
     u64 value;
-};
+}
 
 interface ldr::IProcessManagerInterface is "ldr:pm" {
     [0] CreateProcess(sf::OutMoveHandle proc_h, ldr::PinId id, u32 flags, sf::CopyHandle reslimit_h);

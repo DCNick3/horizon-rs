@@ -23,7 +23,7 @@ struct fssrv::FsSaveDataCreationInfo {
 
     /// Uninitialized for ::FsSaveDataType_System.
     sf::Bytes<0x1a> padding;
-};
+}
 
 struct fssrv::FsSaveDataAttribute {
     /// ApplicationId of the savedata to access when accessing other programs' savedata via SaveData, otherwise FS_SAVEDATA_CURRENT_APPLICATIONID.
@@ -56,7 +56,7 @@ struct fssrv::FsSaveDataAttribute {
 
     /// 0 for ::FsSaveDataType_System/::FsSaveDataType_Account.
     u64 unk_x_38;
-};
+}
 
 struct fssrv::DirectoryEntry {
     /// TODO: should the fssrv::Path be aligned to 4 bytes?
@@ -65,12 +65,12 @@ struct fssrv::DirectoryEntry {
 
 	fssrv::DirectoryEntryType typ;
 	u64 filesize;
-};
+}
 
 enum fssrv::DirectoryEntryType : u8 {
 	Directory = 0,
 	File = 1,
-};
+}
 
 enum fssrv::Partition : u32 {
 	BootPartition1Root = 0,
@@ -87,7 +87,7 @@ enum fssrv::Partition : u32 {
 	SafeMode = 29,
 	SystemProperEncryption = 30,
 	User = 31,
-};
+}
 
 enum fssrv::FileSystemType : u32 {
 	Invalid = 0,
@@ -98,7 +98,7 @@ enum fssrv::FileSystemType : u32 {
 	ContentMeta = 5,
 	ContentData = 6,
 	ApplicationPackage = 7,
-};
+}
 
 interface fssrv::IFileSystemProxy is "fsp-srv" {
     [18] OpenSdCardFileSystem(
@@ -111,7 +111,7 @@ struct fssrv::CodeVerificationData : sf::LargeData {
     sf::Bytes<32>  target_hash;
     b8             has_data;
     sf::Bytes<3>   reserved;
-};
+}
 
 interface fssrv::IFileSystemProxyForLoader is "fsp-ldr" {
     [0] OpenCodeFileSystem(
@@ -126,7 +126,7 @@ interface fssrv::IFileSystemProxyForLoader is "fsp-ldr" {
 
 struct fssrv::Path : sf::LargeData {
     sf::Bytes<0x301> str;
-};
+}
 
 struct fssrv::FileTimeStampRaw {
     i64 create;
@@ -134,24 +134,24 @@ struct fssrv::FileTimeStampRaw {
     i64 access;
     b8 is_local_time;
     sf::Bytes<7> pad;
-};
+}
 
 bitflags fssrv::CreateOption : u32 {
     BigFile = 0x1,
-};
+}
 
 enum fssrv::QueryId : u32 {
     SetConcatenationFileAttribute = 0,
     UpdateMac = 1,
     IsSignedSystemPartitionOnSdCardValid = 2,
     QueryUnpreparedFileInformation = 3,
-};
+}
 
 bitflags fssrv::OpenDirectoryMode : u32 {
     ReadDirs   = 0x0000001,
     ReadFiles  = 0x0000002,
     NoFileSize = 0x8000000,
-};
+}
 
 interface fssrv::IFileSystem {
     [0] CreateFile(fssrv::Path path, i64 size, fssrv::CreateOption option);
