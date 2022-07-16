@@ -6,10 +6,10 @@ const PATH_SIZE: usize = 0x300;
 impl Path {
     pub fn new(s: impl AsRef<[u8]>) -> Self {
         let s = s.as_ref();
-        assert!(s.len() <= PATH_SIZE);
         let mut r = Self { str: [0; 0x301] };
 
-        r.str.copy_from_slice(s);
+        assert!(s.len() <= PATH_SIZE);
+        r.str[..s.len()].copy_from_slice(s);
 
         r
     }
@@ -21,7 +21,13 @@ impl Path {
 
 impl AsRef<[u8]> for Path {
     fn as_ref(&self) -> &[u8] {
-        let (len, _) = self.str.iter().enumerate().find(|(_, p)| p == 0).unwrap();
+        let (len, _) = self
+            .str
+            .iter()
+            .cloned()
+            .enumerate()
+            .find(|&(_, p)| p == 0)
+            .unwrap();
         &self.str[..len]
     }
 }
