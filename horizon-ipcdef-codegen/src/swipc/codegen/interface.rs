@@ -83,6 +83,12 @@ fn imp_cmif_in_header() -> Tokens {
     quote!($imp)
 }
 
+fn imp_cmif_out_header() -> Tokens {
+    let imp = rust::import("horizon_ipc::raw::cmif", "CmifOutHeader");
+
+    quote!($imp)
+}
+
 fn imp_ipc_buffer_repr() -> Tokens {
     let imp = rust::import("horizon_ipc::buffer", "IpcBufferRepr");
 
@@ -166,8 +172,12 @@ struct CommandWireFormatInfo {
 }
 
 impl CommandWireFormatInfo {
-    pub fn has_special_header(&self) -> bool {
-        self.should_pass_pid || !self.handles_in.is_empty() || self.handles_out.is_empty()
+    pub fn has_in_special_header(&self) -> bool {
+        self.should_pass_pid || !self.handles_in.is_empty()
+    }
+
+    pub fn has_out_special_header(&self) -> bool {
+        !self.handles_out.is_empty()
     }
 
     fn get_buffers(&self, mut filter: impl FnMut(&Buffer) -> bool) -> Vec<Buffer> {
@@ -226,6 +236,14 @@ impl CommandWireFormatInfo {
     pub fn in_raw_data_struct(&self) -> Struct {
         raw_data_struct(
             self.raw_data_in
+                .iter()
+                .map(|d| (d.name.clone(), d.ty.clone())),
+        )
+    }
+
+    pub fn out_raw_data_struct(&self) -> Struct {
+        raw_data_struct(
+            self.raw_data_out
                 .iter()
                 .map(|d| (d.name.clone(), d.ty.clone())),
         )
@@ -564,8 +582,6 @@ fn make_raw_data_in_type(
 }
 
 fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawDataIn]) -> Tokens {
-    let s = raw_data_struct(data.iter().map(|d| (d.name.clone(), d.ty.clone())));
-
     if data.is_empty() {
         (quote! {
             let data_in = ();
@@ -581,6 +597,7 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
             });
         }
     } else {
+        let s = raw_data_struct(data.iter().map(|d| (d.name.clone(), d.ty.clone())));
         let mut padding_helper = PaddingHelper::new();
 
         quote! {
@@ -610,6 +627,47 @@ fn make_raw_data_in(namespace: &Namespace, ctx: &CodegenContext, data: &[RawData
     }
 }
 
+fn make_raw_data_out_type(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    data: &[RawDataOut],
+) -> Tokens {
+    if data.is_empty() {
+        (quote! {
+            ()
+        } as Tokens)
+    } else if let [data] = data {
+        quote! {
+            $(make_nominal_type(namespace, &data.ty))
+        }
+    } else {
+        quote! {
+            Out
+        }
+    }
+}
+
+fn make_raw_data_out_struct(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    data: &[RawDataOut],
+) -> Tokens {
+    if data.len() <= 1 {
+        (quote! {} as Tokens)
+    } else {
+        let s = raw_data_struct(data.iter().map(|d| (d.name.clone(), d.ty.clone())));
+
+        quote! {
+            $(make_raw_data_struct(
+                namespace,
+                ctx,
+                Direction::Out,
+                &s
+            ))
+        }
+    }
+}
+
 struct RequestSizes {
     cmif_header_offset: usize,
     data_size: usize,
@@ -630,7 +688,7 @@ fn request_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Reques
     let out_pointer_sizes_count = w_info.out_pointer_sizes_count();
 
     let cmif_header_offset = 8 + // HIPC header
-        if w_info.has_special_header() {
+        if w_info.has_in_special_header() {
             4 + // special header
                 (should_pass_pid as usize) * 8 +
                 handles_in.len() * 4
@@ -658,6 +716,44 @@ fn request_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Reques
         cmif_header_offset,
         data_size,
         request_size,
+    }
+}
+
+struct ResponseSizes {
+    cmif_header_offset: usize,
+    data_size: usize,
+    response_size: usize,
+}
+
+fn response_sizes(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> ResponseSizes {
+    let &CommandWireFormatInfo {
+        should_pass_pid,
+        ref handles_out,
+        ..
+    } = w_info;
+
+    let out_pointer_buffers = w_info.out_pointer_buffers();
+
+    let cmif_header_offset = 8 + // HIPC header
+        if w_info.has_out_special_header() {
+            4 + // special header
+                handles_out.len() * 4
+        } else { 0 } +
+        out_pointer_buffers.len() * 8; // descriptors (would be in_pointer)
+
+    let raw_data_size = w_info.out_raw_data_struct().layout(ctx).size();
+
+    let data_size = 16 + // padding
+        16 + // CMIF header
+        raw_data_size as usize +
+        ((4 - raw_data_size % 4) % 4) as usize; // pad raw data to word size (4 bytes)
+
+    let response_size = cmif_header_offset + data_size;
+
+    ResponseSizes {
+        cmif_header_offset,
+        data_size,
+        response_size,
     }
 }
 
@@ -704,7 +800,7 @@ fn make_request_struct(
         #[repr(packed)]
         struct Request {
             hipc: $(imp_hipc_header()),
-            $(if w_info.has_special_header() {
+            $(if w_info.has_in_special_header() {
                 special_header: $(imp_hipc_special_header()),
                 $(if should_pass_pid => pid_placeholder: u64,)
                 $(for h in handles_in {
@@ -746,6 +842,69 @@ fn make_request_struct(
 
         // SAFETY: we checked the size before, so it should fit
         unsafe impl $(imp_ipc_buffer_repr()) for Request {}
+    };
+
+    r
+}
+
+fn make_response_struct(
+    namespace: &Namespace,
+    ctx: &CodegenContext,
+    w_info: &CommandWireFormatInfo,
+) -> Tokens {
+    let &CommandWireFormatInfo {
+        ref handles_out, ..
+    } = w_info;
+
+    let out_pointer_buffers = w_info.out_pointer_buffers();
+
+    if w_info.is_domain {
+        todo!("Domain codegen")
+    }
+
+    let ResponseSizes {
+        cmif_header_offset,
+        data_size,
+        response_size,
+    } = response_sizes(ctx, w_info);
+
+    if response_size > 0x100 {
+        panic!("Request struct is too large, would not fit into the IPC command buffer")
+    }
+
+    // use the offset to calculate cmif padding size
+    let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
+
+    let raw_data_size = w_info.out_raw_data_struct().layout(ctx).size();
+
+    let raw_data_word_padding = (4 - (raw_data_size % 4)) % 4;
+
+    let r: Tokens = quote! {
+        #[repr(packed)]
+        struct Response {
+            hipc: $(imp_hipc_header()),
+            $(if w_info.has_out_special_header() {
+                special_header: $(imp_hipc_special_header()),
+                $(for h in handles_out {
+                    $(format!("handle_{}", h.name)): $(imp_raw_handle()),
+                })
+            })
+            $(for (i, _) in out_pointer_buffers.iter().enumerate() {
+                $(format!("in_pointer_desc_{}", i)): $(imp_in_pointer_desc()),
+            })
+
+            pre_padding: [u8; $pre_cmif_padding],
+            cmif: $(imp_cmif_out_header()),
+            raw_data: $(make_raw_data_out_type(namespace, ctx, &w_info.raw_data_out)),
+            raw_data_word_padding: [u8; $raw_data_word_padding],
+            post_padding: [u8; $(16 - pre_cmif_padding)],
+        }
+
+        _comment_!("Compiler time request size check");
+        let _ = ::core::mem::transmute::<Response, [u8; $response_size]>;
+
+        // SAFETY: we checked the size before, so it should fit
+        unsafe impl $(imp_ipc_buffer_repr()) for Response {}
     };
 
     r
@@ -817,13 +976,13 @@ fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens 
                 $(sizes.data_size / 4), // num_data_words
                 $(out_pointer_mode),
                 0, // recv_list_offset
-                $(if w_info.has_special_header() {
+                $(if w_info.has_in_special_header() {
                     true
                 } else {
                     false
                 }),
             ),
-            $(if w_info.has_special_header() {
+            $(if w_info.has_in_special_header() {
                 special_header: $(imp_hipc_special_header())::new(
                     $(if should_pass_pid {
                         true
@@ -911,6 +1070,7 @@ fn make_command_body(
         $(make_raw_data_in(namespace, ctx, &raw_data_in))
 
         $(make_request_struct(namespace, ctx, w_info))
+        $(make_response_struct(namespace, ctx, w_info))
 
         $(for (name, ty) in uninit_vars {
             let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();

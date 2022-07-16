@@ -2,7 +2,7 @@ use horizon_error::Result;
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
 use horizon_ipc::cmif::SessionHandle;
-use horizon_ipc::raw::cmif::CmifInHeader;
+use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
 #[repr(C, packed)]
 pub struct ServiceName {
@@ -33,6 +33,18 @@ impl IUserInterface {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -70,6 +82,20 @@ impl IUserInterface {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_session_handle: RawHandle,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -123,6 +149,20 @@ impl IUserInterface {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_port_handle: RawHandle,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -149,7 +189,6 @@ impl IUserInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: ServiceName,
@@ -157,14 +196,25 @@ impl IUserInterface {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,

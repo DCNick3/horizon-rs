@@ -1,9 +1,10 @@
 use bitflags::bitflags;
 use core::mem::MaybeUninit;
 use horizon_error::Result;
+use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
 use horizon_ipc::cmif::SessionHandle;
-use horizon_ipc::raw::cmif::CmifInHeader;
+use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
@@ -108,6 +109,20 @@ impl IFileSystemProxy {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 40]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_out: RawHandle,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -167,6 +182,21 @@ impl IFileSystemProxyForLoader {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 64]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_out_fs: RawHandle,
+            in_pointer_desc_0: HipcInPointerBufferDescriptor,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 56]>;
+        unsafe impl IpcBufferRepr for Response {}
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
         unsafe {
             ::core::ptr::write(
@@ -196,7 +226,6 @@ impl IFileSystemProxyForLoader {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: u64,
@@ -204,14 +233,25 @@ impl IFileSystemProxyForLoader {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: bool,
+            raw_data_word_padding: [u8; 3],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 44]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -244,6 +284,18 @@ impl IFileSystemProxyForLoader {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -326,7 +378,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -335,14 +386,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 68]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 64]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 12, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 12, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -365,7 +427,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -374,14 +435,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -404,7 +476,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -413,14 +484,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -443,7 +525,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -452,14 +533,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -482,7 +574,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -491,14 +582,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -521,7 +623,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             in_pointer_desc_1: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
@@ -531,14 +632,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 56]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     in_pointer_desc_1: todo!(),
                     pre_padding: Default::default(),
@@ -562,7 +674,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             in_pointer_desc_1: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
@@ -572,14 +683,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 60]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 56]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     in_pointer_desc_1: todo!(),
                     pre_padding: Default::default(),
@@ -603,7 +725,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -612,14 +733,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: u32,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 44]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -652,6 +784,20 @@ impl IFileSystem {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_out: RawHandle,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -689,6 +835,20 @@ impl IFileSystem {
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            special_header: HipcSpecialHeader,
+            handle_out: RawHandle,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
@@ -716,7 +876,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
             raw_data: (),
@@ -724,14 +883,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 44]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 40]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -753,7 +923,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -762,14 +931,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -792,7 +972,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -801,14 +980,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -831,7 +1021,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -840,14 +1029,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -870,7 +1070,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
@@ -879,14 +1078,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: FileTimeStampRaw,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 72]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
@@ -915,7 +1125,6 @@ impl IFileSystem {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            special_header: HipcSpecialHeader,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             in_map_alias_desc_0: HipcMapAliasBufferDescriptor,
             out_map_alias_desc_0: HipcMapAliasBufferDescriptor,
@@ -926,14 +1135,25 @@ impl IFileSystem {
             post_padding: [u8; 16],
         }
         // Compiler time request size check
-        let _ = ::core::mem::transmute::<Request, [u8; 80]>;
+        let _ = ::core::mem::transmute::<Request, [u8; 76]>;
         unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 0],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Response {}
         unsafe {
             ::core::ptr::write(
                 get_ipc_buffer_for(),
                 Request {
-                    hipc: HipcHeader::new(4, 1, 1, 1, 0, 9, 0, 0, true),
-                    special_header: HipcSpecialHeader::new(false, 0, 0),
+                    hipc: HipcHeader::new(4, 1, 1, 1, 0, 9, 0, 0, false),
                     in_pointer_desc_0: todo!(),
                     in_map_alias_desc_0: todo!(),
                     out_map_alias_desc_0: todo!(),
