@@ -3,8 +3,9 @@ use bitflags::bitflags;
 use core::mem::MaybeUninit;
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
-use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
+use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::hipc::MapAliasBufferMode;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
@@ -115,7 +116,6 @@ impl IFileSystemProxy {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -129,10 +129,10 @@ impl IFileSystemProxy {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
                     pre_padding: Default::default(),
@@ -148,11 +148,17 @@ impl IFileSystemProxy {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
+            self.handle.0,
+        );
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -213,7 +219,6 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 64]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -228,14 +233,18 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 56]>;
-        unsafe impl IpcBufferRepr for Response {}
         let out_verif = MaybeUninit::<CodeVerificationData>::uninit();
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 10, 3, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -246,13 +255,22 @@ impl IFileSystemProxyForLoader {
                     raw_data: data_in,
                     raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
-                    out_pointer_desc_0: todo!(),
+                    out_pointer_desc_0: HipcOutPointerBufferDescriptor::new(
+                        out_verif.as_ptr() as usize,
+                        ::core::mem::size_of_val(&out_verif),
+                    ),
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
+            self.handle.0,
+        );
         let Response {
             hipc,
             special_header,
@@ -260,7 +278,7 @@ impl IFileSystemProxyForLoader {
             cmif,
             raw_data: (),
             ..
-        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
         debug_assert_eq!(hipc.num_in_pointers(), 1);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -291,7 +309,6 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -303,10 +320,10 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 44]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
@@ -322,11 +339,17 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -353,7 +376,6 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -365,10 +387,10 @@ impl IFileSystemProxyForLoader {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
                     special_header: HipcSpecialHeader::new(true, 0, 0),
@@ -386,11 +408,17 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -482,7 +510,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 64]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -494,13 +521,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 12, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -514,11 +545,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::CreateFile", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::CreateFile", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -544,7 +575,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -556,13 +586,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -576,11 +610,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::DeleteFile", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::DeleteFile", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -606,7 +640,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -618,13 +651,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -638,11 +675,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::CreateDirectory", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::CreateDirectory", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -668,7 +705,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -680,13 +716,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -700,11 +740,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::DeleteDirectory", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::DeleteDirectory", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -730,7 +770,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -742,13 +781,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -762,11 +805,17 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystem::DeleteDirectoryRecursively",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystem::DeleteDirectoryRecursively",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -793,7 +842,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -805,14 +853,22 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
-                    in_pointer_desc_1: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        old_path as *const _ as usize,
+                        ::core::mem::size_of_val(old_path),
+                    ),
+                    in_pointer_desc_1: HipcInPointerBufferDescriptor::new(
+                        1,
+                        new_path as *const _ as usize,
+                        ::core::mem::size_of_val(new_path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -826,11 +882,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::RenameFile", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::RenameFile", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -857,7 +913,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -869,14 +924,22 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
-                    in_pointer_desc_1: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        old_path as *const _ as usize,
+                        ::core::mem::size_of_val(old_path),
+                    ),
+                    in_pointer_desc_1: HipcInPointerBufferDescriptor::new(
+                        1,
+                        new_path as *const _ as usize,
+                        ::core::mem::size_of_val(new_path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -890,11 +953,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::RenameDirectory", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::RenameDirectory", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -920,7 +983,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -932,13 +994,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 44]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -952,11 +1018,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::GetEntryType", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::GetEntryType", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -982,7 +1048,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -996,13 +1061,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 9, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1016,11 +1085,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::OpenFile", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::OpenFile", self.handle.0);
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1056,7 +1125,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1070,13 +1138,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 9, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1090,11 +1162,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::OpenDirectory", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::OpenDirectory", self.handle.0);
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1125,7 +1197,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1137,10 +1208,10 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
                     pre_padding: Default::default(),
@@ -1156,11 +1227,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::Commit", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::Commit", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1186,7 +1257,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1198,13 +1268,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1218,11 +1292,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1248,7 +1322,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1260,13 +1333,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1280,11 +1357,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1310,7 +1387,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1322,13 +1398,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1342,11 +1422,17 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "fssrv::IFileSystem::CleanDirectoryRecursively",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "fssrv::IFileSystem::CleanDirectoryRecursively",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1372,7 +1458,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1384,13 +1469,17 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 72]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1404,11 +1493,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1442,7 +1531,6 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 76]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1454,15 +1542,27 @@ impl IFileSystem {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 1, 1, 1, 0, 9, 0, 0, false),
-                    in_pointer_desc_0: todo!(),
-                    in_map_alias_desc_0: todo!(),
-                    out_map_alias_desc_0: todo!(),
+                    in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
+                        0,
+                        path as *const _ as usize,
+                        ::core::mem::size_of_val(path),
+                    ),
+                    in_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        in_buf.as_ptr() as usize,
+                        ::core::mem::size_of_val(in_buf),
+                    ),
+                    out_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        out_buf.as_ptr() as usize,
+                        ::core::mem::size_of_val(out_buf),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1476,11 +1576,11 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IFileSystem::QueryEntry", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IFileSystem::QueryEntry", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1512,7 +1612,7 @@ pub struct IDirectory {
     pub(crate) handle: SessionHandle,
 }
 impl IDirectory {
-    pub fn read(&self, out_entries: &mut [u8]) -> Result<i64> {
+    pub fn read(&self, out_entries: &mut [DirectoryEntry]) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
         struct Request {
@@ -1526,7 +1626,6 @@ impl IDirectory {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 52]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1538,13 +1637,17 @@ impl IDirectory {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 1, 0, 8, 0, 0, false),
-                    out_map_alias_desc_0: todo!(),
+                    out_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::Normal,
+                        out_entries.as_ptr() as usize,
+                        ::core::mem::size_of_val(out_entries),
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1558,11 +1661,11 @@ impl IDirectory {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IDirectory::Read", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IDirectory::Read", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -1587,7 +1690,6 @@ impl IDirectory {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -1599,10 +1701,10 @@ impl IDirectory {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
                     pre_padding: Default::default(),
@@ -1618,11 +1720,11 @@ impl IDirectory {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("fssrv::IDirectory::GetEntryCount", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("fssrv::IDirectory::GetEntryCount", self.handle.0);
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);

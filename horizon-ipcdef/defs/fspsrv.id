@@ -184,6 +184,6 @@ interface fssrv::IFile {
 }
 
 interface fssrv::IDirectory {
-    [0] Read(sf::Out<i64> out, sf::OutBuffer out_entries);
+    [0] Read(sf::Out<i64> out, sf::OutArray<fssrv::DirectoryEntry> out_entries);
     [1] GetEntryCount(sf::Out<i64> out);
 }

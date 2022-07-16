@@ -18,6 +18,7 @@ from_bytes_impl_transmute!(HipcOutPointerBufferDescriptor);
 from_bytes_impl_transmute!(HipcMapAliasBufferDescriptor);
 
 impl HipcHeader {
+    #[inline]
     pub fn new(
         type_: u16,
         num_in_pointers: u32,
@@ -48,6 +49,7 @@ impl HipcHeader {
 }
 
 impl HipcSpecialHeader {
+    #[inline]
     pub fn new(send_pid: bool, num_copy_handles: u32, num_move_handles: u32) -> Self {
         // TODO: make bitfield construction const
         Self {
@@ -62,10 +64,11 @@ impl HipcSpecialHeader {
 }
 
 impl HipcInPointerBufferDescriptor {
+    #[inline]
     pub fn new(index: usize, address: usize, size: usize) -> Self {
-        assert_eq!(index >> 6, 0, "Invalid buffer index");
-        assert_eq!(address >> 39, 0, "Invalid buffer address");
-        assert_eq!(size >> 16, 0, "Invalid buffer size");
+        debug_assert_eq!(index >> 6, 0, "Invalid buffer index");
+        debug_assert_eq!(address >> 39, 0, "Invalid buffer address");
+        debug_assert_eq!(size >> 16, 0, "Invalid buffer size");
 
         let address_low = address as u32;
         let address_mid = ((address >> 32) & 0b1111) as u32;
@@ -79,9 +82,10 @@ impl HipcInPointerBufferDescriptor {
 }
 
 impl HipcOutPointerBufferDescriptor {
+    #[inline]
     pub fn new(address: usize, size: usize) -> Self {
-        assert_eq!(address >> 39, 0, "Invalid buffer address");
-        assert_eq!(size >> 16, 0, "Invalid buffer size");
+        debug_assert_eq!(address >> 39, 0, "Invalid buffer address");
+        debug_assert_eq!(size >> 16, 0, "Invalid buffer size");
 
         let address_low = address as u32;
         let address_high = ((address >> 32) & 0b1111111) as u32;
@@ -94,9 +98,10 @@ impl HipcOutPointerBufferDescriptor {
 }
 
 impl HipcMapAliasBufferDescriptor {
+    #[inline]
     pub fn new(mode: MapAliasBufferMode, address: usize, size: usize) -> Self {
-        assert_eq!(address >> 39, 0, "Invalid buffer address");
-        assert_eq!(size >> 16, 0, "Invalid buffer size");
+        debug_assert_eq!(address >> 39, 0, "Invalid buffer address");
+        debug_assert_eq!(size >> 16, 0, "Invalid buffer size");
 
         let address_low = address as u32;
         let address_mid = ((address >> 32) & 0b1111) as u32;

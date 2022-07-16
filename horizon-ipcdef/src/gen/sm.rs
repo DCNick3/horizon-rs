@@ -1,7 +1,7 @@
 #![allow(unused_qualifications)]
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
-use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
+use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
@@ -34,7 +34,6 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -46,10 +45,10 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
                     special_header: HipcSpecialHeader::new(true, 0, 0),
@@ -67,11 +66,11 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("sm::IUserInterface::Initialize", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("sm::IUserInterface::Initialize", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -96,7 +95,6 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -110,10 +108,10 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
@@ -129,9 +127,9 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("sm::IUserInterface::GetService", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("sm::IUserInterface::GetService", self.handle.0);
         let Response {
             hipc,
             special_header,
@@ -139,7 +137,7 @@ impl IUserInterface {
             cmif,
             raw_data: (),
             ..
-        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -184,7 +182,6 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -198,10 +195,10 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, false),
                     pre_padding: Default::default(),
@@ -217,9 +214,9 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("sm::IUserInterface::RegisterService", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("sm::IUserInterface::RegisterService", self.handle.0);
         let Response {
             hipc,
             special_header,
@@ -227,7 +224,7 @@ impl IUserInterface {
             cmif,
             raw_data: (),
             ..
-        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -254,7 +251,6 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -266,10 +262,10 @@ impl IUserInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
@@ -285,11 +281,11 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("sm::IUserInterface::UnregisterService", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("sm::IUserInterface::UnregisterService", self.handle.0);
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);

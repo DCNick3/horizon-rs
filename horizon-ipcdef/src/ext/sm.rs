@@ -1,6 +1,6 @@
 use crate::gen::sm::IUserInterface;
 use crate::sm::ServiceName;
-use core::fmt::{Debug, Display, Formatter};
+use core::fmt::{Display, Formatter};
 use horizon_error::Result;
 use horizon_ipc::cmif::SessionHandle;
 use horizon_svc::RawHandle;

@@ -89,14 +89,14 @@ fn imp_cmif_out_header() -> Tokens {
     quote!($imp)
 }
 
-fn imp_ipc_buffer_repr() -> Tokens {
-    let imp = rust::import("horizon_ipc::buffer", "IpcBufferRepr");
+fn imp_get_ipc_buffer_for() -> Tokens {
+    let imp = rust::import("horizon_ipc::buffer", "get_ipc_buffer_for");
 
     quote!($imp)
 }
 
-fn imp_get_ipc_buffer_for() -> Tokens {
-    let imp = rust::import("horizon_ipc::buffer", "get_ipc_buffer_for");
+fn imp_get_ipc_buffer_ptr() -> Tokens {
+    let imp = rust::import("horizon_ipc::buffer", "get_ipc_buffer_ptr");
 
     quote!($imp)
 }
@@ -854,9 +854,6 @@ fn make_request_struct(
 
         _comment_!("Compiler time request size check");
         let _ = ::core::mem::transmute::<Request, [u8; $(request_size)]>;
-
-        // SAFETY: we checked the size before, so it should fit
-        unsafe impl $(imp_ipc_buffer_repr()) for Request {}
     };
 
     r
@@ -917,9 +914,6 @@ fn make_response_struct(
 
         _comment_!("Compiler time request size check");
         let _ = ::core::mem::transmute::<Response, [u8; $response_size]>;
-
-        // SAFETY: we checked the size before, so it should fit
-        unsafe impl $(imp_ipc_buffer_repr()) for Response {}
     };
 
     r
@@ -1024,6 +1018,86 @@ fn make_buffer_size(buffer: &Buffer) -> Tokens {
     }) as Tokens
 }
 
+enum DescriptorType {
+    MapAlias,
+    InPointer,
+    OutPointer,
+}
+
+fn make_buffer_desc(ty: DescriptorType, index: usize, buffer: &Buffer) -> Tokens {
+    let (addr, size) = match &buffer.source {
+        BufferSource::ByteSlice(name) | BufferSource::TypedSlice(name) => (
+            quote! {
+                $(name.as_str()).as_ptr() as usize
+            },
+            quote! {
+                ::core::mem::size_of_val($(name.as_str()))
+            },
+        )
+            as (Tokens, Tokens),
+        BufferSource::TypedUninitVariable(name) => (
+            quote! {
+                $(name.as_str()).as_ptr() as usize
+            },
+            quote! {
+                ::core::mem::size_of_val(&$(name.as_str()))
+            },
+        ),
+        BufferSource::TypedReference(name) => (
+            quote! {
+                $(name.as_str()) as *const _ as usize
+            },
+            quote! {
+                ::core::mem::size_of_val($(name.as_str()))
+            },
+        ),
+    };
+
+    let alias_desc = rust::import("horizon_ipc::raw::hipc", "HipcMapAliasBufferDescriptor");
+    let ptr_in_desc = rust::import("horizon_ipc::raw::hipc", "HipcInPointerBufferDescriptor");
+    let ptr_out_desc = rust::import("horizon_ipc::raw::hipc", "HipcOutPointerBufferDescriptor");
+
+    let alias_buffer_mode = rust::import("horizon_ipc::hipc", "MapAliasBufferMode");
+
+    let extra_attrs = quote! {
+        $(match buffer.extra_attrs {
+            BufferExtraAttrs::None => $alias_buffer_mode::Normal,
+            BufferExtraAttrs::AllowNonSecure => $alias_buffer_mode::NonSecure,
+            BufferExtraAttrs::AllowNonDevice => $alias_buffer_mode::NonDevice,
+        })
+    };
+
+    (quote! {
+        $(match ty {
+            DescriptorType::MapAlias => {
+                $alias_desc::new(
+                    $extra_attrs,
+                    $addr,
+                    $size
+                )
+            }
+            DescriptorType::InPointer => {
+                $(if buffer.transfer_mode == BufferTransferMode::AutoSelect {
+                    // TODO: use pointer transfer mode if enough space in pointer buffer
+                    // need to decide that at runtime though
+                    $ptr_in_desc::new($index, 0, 0)
+                } else {
+                    $ptr_in_desc::new($index, $addr, $size)
+                })
+            }
+            DescriptorType::OutPointer => {
+                $(if buffer.transfer_mode == BufferTransferMode::AutoSelect {
+                    // TODO: use pointer transfer mode if enough space in pointer buffer
+                    // need to decide that at runtime though
+                    $ptr_out_desc::new(0, 0)
+                } else {
+                    $ptr_out_desc::new($addr, $size)
+                })
+            }
+        })
+    } as Tokens)
+}
+
 fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
     let &CommandWireFormatInfo {
         should_pass_pid,
@@ -1093,14 +1167,17 @@ fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens 
                     $(format!("handle_{}", h.name)): $(h.name.as_str()),
                 })
             })
-            $(for (i, _) in in_pointer_buffers.iter().enumerate() {
-                $(format!("in_pointer_desc_{}", i)): todo!(),
+            $(for (i, b) in in_pointer_buffers.iter().enumerate() {
+                $(format!("in_pointer_desc_{}", i)):
+                    $(make_buffer_desc(DescriptorType::InPointer, i, b)),
             })
-            $(for (i, _) in in_map_aliases.iter().enumerate() {
-                $(format!("in_map_alias_desc_{}", i)): todo!(),
+            $(for (i, b) in in_map_aliases.iter().enumerate() {
+                $(format!("in_map_alias_desc_{}", i)):
+                    $(make_buffer_desc(DescriptorType::MapAlias, i, b)),
             })
-            $(for (i, _) in out_map_aliases.iter().enumerate() {
-                $(format!("out_map_alias_desc_{}", i)): todo!(),
+            $(for (i, b) in out_map_aliases.iter().enumerate() {
+                $(format!("out_map_alias_desc_{}", i)):
+                    $(make_buffer_desc(DescriptorType::MapAlias, i, b)),
             })
 
             pre_padding: Default::default(),
@@ -1123,8 +1200,9 @@ fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens 
                 out_pointer_size_padding: 0,
             })
 
-            $(for (i, _) in out_pointer_buffers.iter().enumerate() {
-                $(format!("out_pointer_desc_{}", i)): todo!(),
+            $(for (i, b) in out_pointer_buffers.iter().enumerate() {
+                $(format!("out_pointer_desc_{}", i)):
+                    $(make_buffer_desc(DescriptorType::OutPointer, i, b)),
             })
         }
     };
@@ -1146,9 +1224,19 @@ pub enum CommandType {
 fn make_command_body(
     namespace: &Namespace,
     ctx: &CodegenContext,
+    interface: &Interface,
+    command: &Command,
     i_info: &CommandInterfaceInfo,
     w_info: &CommandWireFormatInfo,
 ) -> Tokens {
+    let fq_command_name = format!(
+        "{}::{}::{}",
+        namespace.join("::"),
+        interface.name.ident(),
+        command.name
+    );
+    let fq_command_name = &fq_command_name;
+
     let CommandInterfaceInfo {
         uninit_vars,
         results,
@@ -1177,23 +1265,27 @@ fn make_command_body(
             let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
         })
 
+        let ipc_buffer_ptr = unsafe {
+            $(imp_get_ipc_buffer_ptr())()
+        };
+
         // SAFETY: The pointer should be valid
         unsafe {
             ::core::ptr::write(
-                $(imp_get_ipc_buffer_for())(),
+                ipc_buffer_ptr as *mut _,
                 $(make_request(ctx, w_info))
             )
         };
 
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook($(quoted(fq_command_name)), self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook($(quoted(fq_command_name)), self.handle.0);
 
         // SAFETY: The pointer should be valid
         let $(make_response_pattern(ctx, w_info))
             = unsafe {
                 ::core::ptr::read(
-                    $(imp_get_ipc_buffer_for())()
+                ipc_buffer_ptr as *const _,
                 )
             };
 
@@ -1238,10 +1330,11 @@ fn make_command_body(
 fn make_command(
     namespace: &Namespace,
     ctx: &CodegenContext,
-    c: &Command,
+    interface: &Interface,
+    command: &Command,
     is_domain: bool,
 ) -> Tokens {
-    let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, c);
+    let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, command);
 
     let return_type = if let [(_, res)] = i_info.results.as_slice() {
         quote!($res) as Tokens
@@ -1255,13 +1348,13 @@ fn make_command(
     };
 
     // we expect command names in PascalCase, but convert them to snake_case when converting to rust
-    let name = c.name.to_case(Case::Snake);
+    let name = command.name.to_case(Case::Snake);
     quote! {
         pub fn $name(
             &self,
             $(for (name, ty) in &i_info.args join (,) => $(name.as_str()): $ty)
         ) -> $(imp_result())<$return_type> {
-            $(make_command_body(namespace, ctx, &i_info, &w_info))
+            $(make_command_body(namespace, ctx, interface, command, &i_info, &w_info))
         }
     }
 }
@@ -1285,7 +1378,7 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
 
             impl $name {
                 $(for command in i.commands.iter() join (_blank_!();) {
-                    $(make_command(namespace, ctx, command, i.is_domain))
+                    $(make_command(namespace, ctx, i, command, i.is_domain))
                 })
             }
 

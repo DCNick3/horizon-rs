@@ -2,7 +2,7 @@
 use core::mem::MaybeUninit;
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
-use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
+use horizon_ipc::buffer::get_ipc_buffer_ptr;
 use horizon_ipc::cmif::SessionHandle;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
@@ -75,7 +75,6 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 64]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -89,10 +88,10 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, true),
                     special_header: HipcSpecialHeader::new(false, 1, 0),
@@ -110,9 +109,15 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "ldr::IProcessManagerInterface::CreateProcess",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "ldr::IProcessManagerInterface::CreateProcess",
+            self.handle.0,
+        );
         let Response {
             hipc,
             special_header,
@@ -120,7 +125,7 @@ impl IProcessManagerInterface {
             cmif,
             raw_data: (),
             ..
-        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        } = unsafe { ::core::ptr::read(ipc_buffer_ptr as *const _) };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
         debug_assert_eq!(hipc.num_out_map_aliases(), 0);
@@ -148,7 +153,6 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 64]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -161,11 +165,11 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
         let out_program_info = MaybeUninit::<ProgramInfo>::uninit();
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 3, 0, false),
                     pre_padding: Default::default(),
@@ -178,15 +182,24 @@ impl IProcessManagerInterface {
                     raw_data: data_in,
                     raw_data_word_padding: Default::default(),
                     post_padding: Default::default(),
-                    out_pointer_desc_0: todo!(),
+                    out_pointer_desc_0: HipcOutPointerBufferDescriptor::new(
+                        out_program_info.as_ptr() as usize,
+                        ::core::mem::size_of_val(&out_program_info),
+                    ),
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "ldr::IProcessManagerInterface::GetProgramInfo",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "ldr::IProcessManagerInterface::GetProgramInfo",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 1);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -212,7 +225,6 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -224,10 +236,10 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, false),
                     pre_padding: Default::default(),
@@ -243,11 +255,11 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook("ldr::IProcessManagerInterface::PinProgram", self.handle.0);
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook("ldr::IProcessManagerInterface::PinProgram", self.handle.0);
         let Response { hipc, cmif, raw_data: out_id, .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -272,7 +284,6 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -284,10 +295,10 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
                     pre_padding: Default::default(),
@@ -303,11 +314,17 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "ldr::IProcessManagerInterface::UnpinProgram",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "ldr::IProcessManagerInterface::UnpinProgram",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
@@ -332,7 +349,6 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 44]>;
-        unsafe impl IpcBufferRepr for Request {}
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
@@ -344,10 +360,10 @@ impl IProcessManagerInterface {
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
-        unsafe impl IpcBufferRepr for Response {}
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
         unsafe {
             ::core::ptr::write(
-                get_ipc_buffer_for(),
+                ipc_buffer_ptr as *mut _,
                 Request {
                     hipc: HipcHeader::new(4, 0, 0, 0, 0, 9, 0, 0, false),
                     pre_padding: Default::default(),
@@ -363,11 +379,17 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook();
+        crate::pre_ipc_hook(
+            "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
+            self.handle.0,
+        );
         horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook();
+        crate::post_ipc_hook(
+            "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
+            self.handle.0,
+        );
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
-            ::core::ptr::read(get_ipc_buffer_for())
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
         debug_assert_eq!(hipc.num_in_pointers(), 0);
         debug_assert_eq!(hipc.num_in_map_aliases(), 0);
