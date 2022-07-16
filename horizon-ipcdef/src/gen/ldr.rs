@@ -136,11 +136,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
             out_pointer_desc_0: HipcOutPointerBufferDescriptor,
         }
         // Compiler time request size check
@@ -200,11 +200,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: ProgramLocation,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
@@ -259,11 +259,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: PinId,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
@@ -318,11 +318,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: bool,
             raw_data_word_padding: [u8; 3],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 44]>;

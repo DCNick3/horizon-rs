@@ -682,6 +682,7 @@ fn make_raw_data_out_struct(
     }
 }
 
+#[derive(Debug)]
 struct RequestSizes {
     cmif_header_offset: usize,
     data_size: usize,
@@ -804,11 +805,11 @@ fn make_request_struct(
     }
 
     // use the offset to calculate cmif padding size
-    let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
+    let pre_cmif_padding = (16 - cmif_header_offset % 16) % 16;
 
     let raw_data_size = w_info.in_raw_data_struct().layout(ctx).size();
 
-    let raw_data_word_padding = (4 - (raw_data_size % 4)) % 4;
+    let raw_data_word_padding = (4 - raw_data_size % 4) % 4;
 
     let r: Tokens = quote! {
         #[repr(packed)]

@@ -25,11 +25,11 @@ impl IUserInterface {
             hipc: HipcHeader,
             special_header: HipcSpecialHeader,
             pid_placeholder: u64,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 12],
             cmif: CmifInHeader,
             raw_data: u64,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 4],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 60]>;
@@ -86,11 +86,11 @@ impl IUserInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: ServiceName,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
@@ -173,11 +173,11 @@ impl IUserInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: In,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 56]>;
@@ -242,11 +242,11 @@ impl IUserInterface {
         #[repr(packed)]
         struct Request {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifInHeader,
             raw_data: ServiceName,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Request, [u8; 48]>;
