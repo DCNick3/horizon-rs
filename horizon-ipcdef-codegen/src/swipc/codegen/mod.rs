@@ -192,7 +192,15 @@ impl TokenStorage {
                         contents
                     )
                 } else {
-                    contents
+                    format!(
+                        indoc! {r"
+                        #![allow(
+                            unused_qualifications,  // forever, because we use ::core::* for less ambiguity
+                                                    // (included in all files to make clion happy)
+                        )]
+                        {}"},
+                        contents
+                    )
                 };
 
                 let formatter = make_formatter();

@@ -1,3 +1,4 @@
+#![allow(unused_qualifications)]
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
@@ -36,11 +37,11 @@ impl IUserInterface {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -65,8 +66,20 @@ impl IUserInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn get_service(&self, name: ServiceName) -> Result<RawHandle> {
         let data_in = name;
@@ -114,8 +127,28 @@ impl IUserInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response {
+            hipc,
+            special_header,
+            handle_session_handle: session_handle,
+            cmif,
+            raw_data: (),
+            ..
+        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| session_handle)
     }
     pub fn register_service(
         &self,
@@ -181,8 +214,28 @@ impl IUserInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response {
+            hipc,
+            special_header,
+            handle_port_handle: port_handle,
+            cmif,
+            raw_data: (),
+            ..
+        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| port_handle)
     }
     pub fn unregister_service(&self, name: ServiceName) -> Result<()> {
         let data_in = name;
@@ -201,11 +254,11 @@ impl IUserInterface {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -228,7 +281,19 @@ impl IUserInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
 }

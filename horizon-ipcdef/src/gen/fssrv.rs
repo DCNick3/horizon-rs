@@ -1,3 +1,4 @@
+#![allow(unused_qualifications)]
 use bitflags::bitflags;
 use core::mem::MaybeUninit;
 use horizon_error::Result;
@@ -141,8 +142,26 @@ impl IFileSystemProxy {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 1);
+        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let out = IFileSystem {
+            handle: SessionHandle(out),
+        };
+        cmif.result.into_result_with(|| out)
     }
 }
 /// This struct is marked with sf::LargeData
@@ -188,11 +207,11 @@ impl IFileSystemProxyForLoader {
             special_header: HipcSpecialHeader,
             handle_out_fs: RawHandle,
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 56]>;
@@ -218,8 +237,32 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response {
+            hipc,
+            special_header,
+            handle_out_fs: out_fs,
+            cmif,
+            raw_data: (),
+            ..
+        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        debug_assert_eq!(hipc.num_in_pointers(), 1);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 1);
+        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let out_verif = unsafe { out_verif.assume_init() };
+        let out_fs = IFileSystem {
+            handle: SessionHandle(out_fs),
+        };
+        cmif.result.into_result_with(|| (out_fs, out_verif))
     }
     pub fn is_archived_program(&self, process_id: u64) -> Result<bool> {
         let data_in = process_id;
@@ -238,11 +281,11 @@ impl IFileSystemProxyForLoader {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: bool,
             raw_data_word_padding: [u8; 3],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 44]>;
@@ -265,8 +308,20 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
     }
     pub fn set_current_process(&self) -> Result<()> {
         let data_in = 0u64;
@@ -287,11 +342,11 @@ impl IFileSystemProxyForLoader {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -316,8 +371,20 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
 }
 /// This struct is marked with sf::LargeData
@@ -391,11 +458,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -419,8 +486,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn delete_file(&self, path: &Path) -> Result<()> {
         let data_in = ();
@@ -440,11 +519,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -468,8 +547,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn create_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
@@ -489,11 +580,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -517,8 +608,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn delete_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
@@ -538,11 +641,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -566,8 +669,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn delete_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
@@ -587,11 +702,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -615,8 +730,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn rename_file(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
@@ -637,11 +764,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -666,8 +793,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn rename_directory(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
@@ -688,11 +827,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -717,8 +856,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn get_entry_type(&self, path: &Path) -> Result<u32> {
         let data_in = ();
@@ -738,11 +889,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: u32,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 44]>;
@@ -766,8 +917,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
     }
     pub fn open_file(&self, path: &Path, mode: u32) -> Result<IFile> {
         let data_in = mode;
@@ -817,8 +980,26 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 1);
+        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let out = IFile {
+            handle: SessionHandle(out),
+        };
+        cmif.result.into_result_with(|| out)
     }
     pub fn open_directory(&self, path: &Path, mode: u32) -> Result<IDirectory> {
         let data_in = mode;
@@ -868,8 +1049,26 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 1);
+        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let out = IDirectory {
+            handle: SessionHandle(out),
+        };
+        cmif.result.into_result_with(|| out)
     }
     pub fn commit(&self) -> Result<()> {
         let data_in = ();
@@ -888,11 +1087,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -915,8 +1114,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn get_free_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
@@ -936,11 +1147,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: i64,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
@@ -964,8 +1175,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
     }
     pub fn get_total_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
@@ -985,11 +1208,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: i64,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
@@ -1013,8 +1236,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
     }
     pub fn clean_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
@@ -1034,11 +1269,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -1062,8 +1297,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn get_file_time_stamp_raw(&self, path: &Path) -> Result<FileTimeStampRaw> {
         let data_in = ();
@@ -1083,11 +1330,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: FileTimeStampRaw,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 72]>;
@@ -1111,8 +1358,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
     }
     pub fn query_entry(
         &self,
@@ -1140,11 +1399,11 @@ impl IFileSystem {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -1170,8 +1429,20 @@ impl IFileSystem {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
 }
 pub struct IFile {

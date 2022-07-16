@@ -233,6 +233,20 @@ impl CommandWireFormatInfo {
             .count()
     }
 
+    pub fn out_copy_handles(&self) -> usize {
+        self.handles_out
+            .iter()
+            .filter(|h| h.transfer_type == HandleTransferType::Copy)
+            .count()
+    }
+
+    pub fn out_move_handles(&self) -> usize {
+        self.handles_out
+            .iter()
+            .filter(|h| h.transfer_type == HandleTransferType::Move)
+            .count()
+    }
+
     pub fn in_raw_data_struct(&self) -> Struct {
         raw_data_struct(
             self.raw_data_in
@@ -873,7 +887,7 @@ fn make_response_struct(
     }
 
     // use the offset to calculate cmif padding size
-    let pre_cmif_padding = (16 - (cmif_header_offset * 4) % 16) % 16;
+    let pre_cmif_padding = (16 - (cmif_header_offset) % 16) % 16;
 
     let raw_data_size = w_info.out_raw_data_struct().layout(ctx).size();
 
@@ -908,6 +922,87 @@ fn make_response_struct(
     };
 
     r
+}
+
+fn make_response_pattern(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
+    let CommandWireFormatInfo { handles_out, .. } = w_info;
+
+    let data = w_info.raw_data_out.as_slice();
+
+    let raw_data_pattern: Tokens = if data.is_empty() {
+        (quote! {
+            ()
+        } as Tokens)
+    } else if let [data] = data {
+        quote! {
+            $(data.name.as_str())
+        }
+    } else {
+        quote! {
+            Out {
+                $(for data in data {
+                    $(data.name.as_str()),
+                })
+            }
+        }
+    };
+
+    (quote! {
+        Response {
+            hipc,
+            $(if w_info.has_out_special_header() {
+                special_header,
+                $(for h in handles_out {
+                    $(format!("handle_{}", h.name)): $(h.name.as_str()),
+                })
+            })
+            // I don't think we care about those?
+            // $(for (i, _) in out_pointer_buffers.iter().enumerate() {
+            //     $(format!("in_pointer_desc_{}", i)),
+            // })
+
+            cmif,
+            raw_data: $raw_data_pattern,
+
+            ..
+        }
+    } as Tokens)
+}
+
+fn make_check_response(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens {
+    let ResponseSizes {
+        cmif_header_offset,
+        data_size,
+        response_size,
+    } = response_sizes(ctx, w_info);
+
+    let num_in_pointers = w_info.out_pointer_buffers().len();
+
+    let has_special_header = w_info.has_out_special_header();
+
+    let num_copy_handles = w_info.out_copy_handles();
+    let num_move_handles = w_info.out_move_handles();
+
+    (quote! {
+        debug_assert_eq!(hipc.num_in_pointers(), $num_in_pointers);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+
+        // yuzu currently calculates this incorrectly
+        // debug_assert_eq!(hipc.num_data_words(), $data_size);
+
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), $(has_special_header as u32));
+
+        $(if has_special_header {
+            debug_assert_eq!(special_header.send_pid(), 0);
+            debug_assert_eq!(special_header.num_copy_handles(), $num_copy_handles);
+            debug_assert_eq!(special_header.num_move_handles(), $num_move_handles);
+        })
+
+        debug_assert_eq!(cmif.magic, $(imp_cmif_out_header())::MAGIC);
+    } as Tokens)
 }
 
 fn make_buffer_size(buffer: &Buffer) -> Tokens {
@@ -1053,7 +1148,11 @@ fn make_command_body(
     i_info: &CommandInterfaceInfo,
     w_info: &CommandWireFormatInfo,
 ) -> Tokens {
-    let CommandInterfaceInfo { uninit_vars, .. } = i_info;
+    let CommandInterfaceInfo {
+        uninit_vars,
+        results,
+        ..
+    } = i_info;
     let CommandWireFormatInfo {
         is_domain: _,
         command_id: _,
@@ -1061,13 +1160,14 @@ fn make_command_body(
         raw_data_in,
         raw_data_out,
         handles_in: _,
-        handles_out: _,
+        handles_out,
         should_pass_pid: _,
     } = w_info;
 
     let r: Tokens = quote! {
         // defines a data_in variable
         $(make_raw_data_in(namespace, ctx, &raw_data_in))
+        $(make_raw_data_out_struct(namespace, ctx, &raw_data_out))
 
         $(make_request_struct(namespace, ctx, w_info))
         $(make_response_struct(namespace, ctx, w_info))
@@ -1076,7 +1176,7 @@ fn make_command_body(
             let $(name.as_str()) = $(imp_maybe_uninit())::<$ty>::uninit();
         })
 
-        // SAFETY: The pointer should be valid and has
+        // SAFETY: The pointer should be valid
         unsafe {
             ::core::ptr::write(
                 $(imp_get_ipc_buffer_for())(),
@@ -1084,22 +1184,51 @@ fn make_command_body(
             )
         };
 
-        // TODO: process output
-        $(if raw_data_out.is_empty() {
-        } else {
-            // $(make_raw_data_struct(
-            //     namespace,
-            //     ctx,
-            //     Direction::Out,
-            //     raw_data_out
-            //         .iter()
-            //         .map(|d| (d.name.clone(), d.ty.clone()))
-            // ))
+        crate::pre_ipc_hook();
+        horizon_svc::send_sync_request(self.handle.0)?;
+        crate::post_ipc_hook();
+
+        // SAFETY: The pointer should be valid
+        let $(make_response_pattern(ctx, w_info))
+            = unsafe {
+                ::core::ptr::read(
+                    $(imp_get_ipc_buffer_for())()
+                )
+            };
+
+        $(make_check_response(ctx, w_info))
+
+        $(for (name, _) in uninit_vars {
+            let $(name.as_str()) = unsafe { $(name.as_str()).assume_init() };
         })
 
-        horizon_svc::send_sync_request(self.handle.0)?;
+        $(for h in handles_out {
+            $(match &h.transform {
+                HandleTransformType::RawValue => {},
+                HandleTransformType::Interface(interface) => {
+                    let $(h.name.as_str()) =
+                        $(make_interface_reference(namespace, interface)) {
+                            handle: $(imp_session_handle())($(h.name.as_str()))
+                        };
+                }
+            })
+        })
 
-        todo!("Command codegen")
+        cmif.result.into_result_with(||
+            $(if results.is_empty() {
+                ()
+            } else {
+                $(if let [result] = &results[..] {
+                    $(result.0.as_str())
+                } else {
+                    (
+                        $(for result in results join (,) {
+                            $(result.0.as_str())
+                        })
+                    )
+                })
+            })
+        )
     };
 
     r
@@ -1127,6 +1256,9 @@ fn gen_command_in(
 
     // we expect command names in PascalCase, but convert them to snake_case when converting to rust
     let name = c.name.to_case(Case::Snake);
+    if name == "initialize" {
+        println!("1");
+    }
     quote_in! { *tok =>
         pub fn $name(
             &self,

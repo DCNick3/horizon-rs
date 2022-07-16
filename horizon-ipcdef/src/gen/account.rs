@@ -1,3 +1,4 @@
+#![allow(unused_qualifications)]
 #[repr(C, packed)]
 pub struct Uid {
     pub uid_part_1: u64,

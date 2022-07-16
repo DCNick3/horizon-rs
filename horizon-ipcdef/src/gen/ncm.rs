@@ -1,3 +1,4 @@
+#![allow(unused_qualifications)]
 pub type ProgramId = u64;
 #[repr(u8)]
 pub enum StorageId {

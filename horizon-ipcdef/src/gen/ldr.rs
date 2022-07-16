@@ -1,3 +1,4 @@
+#![allow(unused_qualifications)]
 use core::mem::MaybeUninit;
 use horizon_error::Result;
 use horizon_ipc::RawHandle;
@@ -107,8 +108,28 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response {
+            hipc,
+            special_header,
+            handle_proc_h: proc_h,
+            cmif,
+            raw_data: (),
+            ..
+        } = unsafe { ::core::ptr::read(get_ipc_buffer_for()) };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 1);
+        debug_assert_eq!(special_header.send_pid(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| proc_h)
     }
     pub fn get_program_info(&self, loc: ProgramLocation) -> Result<ProgramInfo> {
         let data_in = loc;
@@ -158,8 +179,21 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 1);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let out_program_info = unsafe { out_program_info.assume_init() };
+        cmif.result.into_result_with(|| out_program_info)
     }
     pub fn pin_program(&self, loc: ProgramLocation) -> Result<PinId> {
         let data_in = loc;
@@ -178,11 +212,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: PinId,
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 48]>;
@@ -205,8 +239,20 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out_id, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out_id)
     }
     pub fn unpin_program(&self, id: PinId) -> Result<()> {
         let data_in = id;
@@ -225,11 +271,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -252,8 +298,20 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
     pub fn set_enabled_program_verification(&self, enabled: bool) -> Result<()> {
         let data_in = enabled;
@@ -272,11 +330,11 @@ impl IProcessManagerInterface {
         #[repr(packed)]
         struct Response {
             hipc: HipcHeader,
-            pre_padding: [u8; 0],
+            pre_padding: [u8; 8],
             cmif: CmifOutHeader,
             raw_data: (),
             raw_data_word_padding: [u8; 0],
-            post_padding: [u8; 16],
+            post_padding: [u8; 8],
         }
         // Compiler time request size check
         let _ = ::core::mem::transmute::<Response, [u8; 40]>;
@@ -299,7 +357,19 @@ impl IProcessManagerInterface {
                 },
             )
         };
+        crate::pre_ipc_hook();
         horizon_svc::send_sync_request(self.handle.0)?;
-        todo!("Command codegen")
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| ())
     }
 }
