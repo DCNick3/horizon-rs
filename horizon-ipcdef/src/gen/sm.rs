@@ -5,7 +5,8 @@ use horizon_ipc::buffer::{IpcBufferRepr, get_ipc_buffer_for};
 use horizon_ipc::cmif::SessionHandle;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct ServiceName {
     pub name: [u8; 8],
 }
@@ -81,6 +82,7 @@ impl IUserInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn get_service(&self, name: ServiceName) -> Result<RawHandle> {
         let data_in = name;
         #[repr(packed)]
@@ -150,6 +152,7 @@ impl IUserInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| session_handle)
     }
+
     pub fn register_service(
         &self,
         name: ServiceName,
@@ -237,6 +240,7 @@ impl IUserInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| port_handle)
     }
+
     pub fn unregister_service(&self, name: ServiceName) -> Result<()> {
         let data_in = name;
         #[repr(packed)]
@@ -297,3 +301,9 @@ impl IUserInterface {
         cmif.result.into_result_with(|| ())
     }
 }
+impl From<RawHandle> for IUserInterface {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+

@@ -59,13 +59,17 @@ struct fssrv::FsSaveDataAttribute {
 };
 
 struct fssrv::DirectoryEntry {
-	sf::Bytes<0x301> path;
-	sf::Bytes<3> pad;
+    /// TODO: should the fssrv::Path be aligned to 4 bytes?
+	fssrv::Path path;
+	sf::Bytes<0x3> padding;
 
-	i8 typ;
-	sf::Bytes<3> pad_2;
+	fssrv::DirectoryEntryType typ;
+	u64 filesize;
+};
 
-	i64 filesize;
+enum fssrv::DirectoryEntryType : u8 {
+	Directory = 0,
+	File = 1,
 };
 
 enum fssrv::Partition : u32 {
@@ -83,11 +87,6 @@ enum fssrv::Partition : u32 {
 	SafeMode = 29,
 	SystemProperEncryption = 30,
 	User = 31,
-};
-
-enum fssrv::DirectoryEntryType : u8 {
-	Directory = 0,
-	File = 1,
 };
 
 enum fssrv::FileSystemType : u32 {
@@ -148,6 +147,12 @@ enum fssrv::QueryId : u32 {
     QueryUnpreparedFileInformation = 3,
 };
 
+bitflags fssrv::OpenDirectoryMode : u32 {
+    ReadDirs   = 0x0000001,
+    ReadFiles  = 0x0000002,
+    NoFileSize = 0x8000000,
+};
+
 interface fssrv::IFileSystem {
     [0] CreateFile(fssrv::Path path, i64 size, fssrv::CreateOption option);
     [1] DeleteFile(fssrv::Path path);
@@ -158,13 +163,20 @@ interface fssrv::IFileSystem {
     [6] RenameDirectory(fssrv::Path old_path, fssrv::Path new_path);
     [7] GetEntryType(sf::Out<u32> out, fssrv::Path path);
     [8] OpenFile(sf::Out<sf::SharedPointer<fssrv::IFile>> out, fssrv::Path path, u32 mode);
-    [9] OpenDirectory(sf::Out<sf::SharedPointer<fssrv::IDirectory>> out, fssrv::Path path, u32 mode);
+    [9] OpenDirectory(
+        sf::Out<sf::SharedPointer<fssrv::IDirectory>> out,
+        fssrv::Path path,
+        fssrv::OpenDirectoryMode mode);
     [10] Commit();
     [11] GetFreeSpaceSize(sf::Out<i64> out, fssrv::Path path);
     [12] GetTotalSpaceSize(sf::Out<i64> out, fssrv::Path path);
     [13] CleanDirectoryRecursively(fssrv::Path path);
     [14] GetFileTimeStampRaw(sf::Out<fssrv::FileTimeStampRaw> out, fssrv::Path path);
-    [15] QueryEntry(sf::OutNonSecureBuffer out_buf, sf::InNonSecureBuffer in_buf, fssrv::QueryId query_id, fssrv::Path path);
+    [15] QueryEntry(
+        sf::OutNonSecureBuffer out_buf,
+        sf::InNonSecureBuffer in_buf,
+        fssrv::QueryId query_id,
+        fssrv::Path path);
 }
 
 interface fssrv::IFile {
@@ -172,5 +184,6 @@ interface fssrv::IFile {
 }
 
 interface fssrv::IDirectory {
-
+    [0] Read(sf::Out<i64> out, sf::OutBuffer out_entries);
+    [1] GetEntryCount(sf::Out<i64> out);
 }

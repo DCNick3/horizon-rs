@@ -11,7 +11,8 @@ use horizon_ipc::raw::hipc::{
 };
 use super::ncm::{ProgramId, ProgramLocation};
 /// This struct is marked with sf::LargeData
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct ProgramInfo {
     pub main_thread_priority: u8,
     pub default_cpu_id: u8,
@@ -29,7 +30,8 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<ProgramInfo, [u8; 1024]>;
 };
 
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct PinId {
     pub value: u64,
 }
@@ -131,6 +133,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| proc_h)
     }
+
     pub fn get_program_info(&self, loc: ProgramLocation) -> Result<ProgramInfo> {
         let data_in = loc;
         #[repr(packed)]
@@ -195,6 +198,7 @@ impl IProcessManagerInterface {
         let out_program_info = unsafe { out_program_info.assume_init() };
         cmif.result.into_result_with(|| out_program_info)
     }
+
     pub fn pin_program(&self, loc: ProgramLocation) -> Result<PinId> {
         let data_in = loc;
         #[repr(packed)]
@@ -254,6 +258,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out_id)
     }
+
     pub fn unpin_program(&self, id: PinId) -> Result<()> {
         let data_in = id;
         #[repr(packed)]
@@ -313,6 +318,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn set_enabled_program_verification(&self, enabled: bool) -> Result<()> {
         let data_in = enabled;
         #[repr(packed)]
@@ -373,3 +379,9 @@ impl IProcessManagerInterface {
         cmif.result.into_result_with(|| ())
     }
 }
+impl From<RawHandle> for IProcessManagerInterface {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+

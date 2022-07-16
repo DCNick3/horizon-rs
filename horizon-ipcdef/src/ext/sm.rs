@@ -3,6 +3,14 @@ use crate::sm::ServiceName;
 use core::fmt::{Debug, Display, Formatter};
 use horizon_error::Result;
 use horizon_ipc::cmif::SessionHandle;
+use horizon_svc::RawHandle;
+
+pub trait SmServiceType: From<RawHandle> {}
+
+pub trait SmService {
+    type Type: SmServiceType;
+    fn name() -> ServiceName;
+}
 
 impl IUserInterface {
     pub fn new() -> Result<Self> {
@@ -51,14 +59,8 @@ impl ServiceName {
     }
 }
 
-impl Debug for ServiceName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("ServiceName").field(&self.as_str()).finish()
-    }
-}
-
 impl Display for ServiceName {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self)
+        f.debug_tuple("ServiceName").field(&self.as_str()).finish()
     }
 }

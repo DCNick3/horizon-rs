@@ -375,7 +375,7 @@ fn collect_command_info(
 
                     handles_out.push(HandleOut {
                         name: name.clone(),
-                        transfer_type: HandleTransferType::Copy,
+                        transfer_type: HandleTransferType::Move,
                         transform: HandleTransformType::Interface(interface_name.clone()),
                     });
 
@@ -1235,13 +1235,12 @@ fn make_command_body(
     r
 }
 
-fn gen_command_in(
+fn make_command(
     namespace: &Namespace,
-    tok: &mut Tokens,
     ctx: &CodegenContext,
     c: &Command,
     is_domain: bool,
-) {
+) -> Tokens {
     let (i_info, w_info) = collect_command_info(namespace, ctx, is_domain, c);
 
     let return_type = if let [(_, res)] = i_info.results.as_slice() {
@@ -1257,10 +1256,7 @@ fn gen_command_in(
 
     // we expect command names in PascalCase, but convert them to snake_case when converting to rust
     let name = c.name.to_case(Case::Snake);
-    if name == "initialize" {
-        println!("1");
-    }
-    quote_in! { *tok =>
+    quote! {
         pub fn $name(
             &self,
             $(for (name, ty) in &i_info.args join (,) => $(name.as_str()): $ty)
@@ -1279,11 +1275,6 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
         todo!("Domain interfaces codegen")
     }
 
-    let mut commands_impl = Tokens::new();
-    for command in i.commands.iter() {
-        gen_command_in(namespace, &mut commands_impl, ctx, command, i.is_domain);
-    }
-
     tok.push(
         namespace.clone(),
         quote! {
@@ -1293,8 +1284,19 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
             }
 
             impl $name {
-                $commands_impl
+                $(for command in i.commands.iter() join (_blank_!();) {
+                    $(make_command(namespace, ctx, command, i.is_domain))
+                })
             }
+
+            impl From<$(imp_raw_handle())> for $name {
+                fn from(h: $(imp_raw_handle())) -> Self {
+                    Self {
+                        handle: $(imp_session_handle())(h)
+                    }
+                }
+            }
+            _blank_!();
         },
     );
 }

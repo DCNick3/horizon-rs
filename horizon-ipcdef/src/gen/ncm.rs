@@ -1,5 +1,6 @@
 #![allow(unused_qualifications)]
 pub type ProgramId = u64;
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum StorageId {
     None = 0,
@@ -10,7 +11,8 @@ pub enum StorageId {
     SdCard = 5,
     Any = 6,
 }
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct ProgramLocation {
     pub program_id: ProgramId,
     pub storage_id: StorageId,

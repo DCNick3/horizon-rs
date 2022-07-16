@@ -57,7 +57,8 @@ pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
         namespace.clone(),
         quote! {
             $(if s.is_large_data { #[doc = " This struct is marked with sf::LargeData"] })
-            #[repr(C, packed)]
+            #[derive(Debug, Clone, Copy)]
+            #[repr(C)] // not packed, but we insert all necessary padding manually
             pub struct $name {
                 $(for f in s.fields_layout(ctx).items.iter() {
                     $(match f {
@@ -89,6 +90,7 @@ pub fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     tok.push(
         namespace.clone(),
         quote! {
+            #[derive(Debug, Clone, Copy)]
             #[repr($base_type)]
             pub enum $name {
                 $(for arm in e.arms.iter() {

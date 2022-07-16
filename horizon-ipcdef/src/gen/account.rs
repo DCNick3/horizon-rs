@@ -1,5 +1,6 @@
 #![allow(unused_qualifications)]
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct Uid {
     pub uid_part_1: u64,
     pub uid_part_2: u64,

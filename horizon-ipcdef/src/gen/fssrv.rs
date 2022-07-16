@@ -12,7 +12,8 @@ use horizon_ipc::raw::hipc::{
 };
 use super::account::Uid;
 use super::ncm::ProgramId;
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct FsSaveDataCreationInfo {
     pub save_data_size: i64,
     pub journal_size: i64,
@@ -28,7 +29,8 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataCreationInfo, [u8; 64]>;
 };
 
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct FsSaveDataAttribute {
     pub application_id: u64,
     pub uid: Uid,
@@ -46,19 +48,27 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataAttribute, [u8; 64]>;
 };
 
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct DirectoryEntry {
-    pub path: [u8; 769],
-    pub pad: [u8; 3],
-    pub typ: i8,
-    pub pad_2: [u8; 3],
-    pub filesize: i64,
+    pub path: Path,
+    pub padding: [u8; 3],
+    pub typ: DirectoryEntryType,
+    pub _padding_0: [u8; 3],
+    pub filesize: u64,
 }
 // Static size check for DirectoryEntry (expect 784 bytes)
 const _: fn() = || {
     let _ = ::core::mem::transmute::<DirectoryEntry, [u8; 784]>;
 };
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum DirectoryEntryType {
+    Directory = 0,
+    File = 1,
+}
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum Partition {
     BootPartition1Root = 0,
@@ -76,11 +86,7 @@ pub enum Partition {
     SystemProperEncryption = 30,
     User = 31,
 }
-#[repr(u8)]
-pub enum DirectoryEntryType {
-    Directory = 0,
-    File = 1,
-}
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum FileSystemType {
     Invalid = 0,
@@ -155,8 +161,8 @@ impl IFileSystemProxy {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 1);
         debug_assert_eq!(special_header.send_pid(), 0);
-        debug_assert_eq!(special_header.num_copy_handles(), 1);
-        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IFileSystem {
             handle: SessionHandle(out),
@@ -164,8 +170,15 @@ impl IFileSystemProxy {
         cmif.result.into_result_with(|| out)
     }
 }
+impl From<RawHandle> for IFileSystemProxy {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+
 /// This struct is marked with sf::LargeData
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct CodeVerificationData {
     pub signature: [u8; 256],
     pub target_hash: [u8; 32],
@@ -255,8 +268,8 @@ impl IFileSystemProxyForLoader {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 1);
         debug_assert_eq!(special_header.send_pid(), 0);
-        debug_assert_eq!(special_header.num_copy_handles(), 1);
-        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out_verif = unsafe { out_verif.assume_init() };
         let out_fs = IFileSystem {
@@ -264,6 +277,7 @@ impl IFileSystemProxyForLoader {
         };
         cmif.result.into_result_with(|| (out_fs, out_verif))
     }
+
     pub fn is_archived_program(&self, process_id: u64) -> Result<bool> {
         let data_in = process_id;
         #[repr(packed)]
@@ -323,6 +337,7 @@ impl IFileSystemProxyForLoader {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out)
     }
+
     pub fn set_current_process(&self) -> Result<()> {
         let data_in = 0u64;
         #[repr(packed)]
@@ -387,8 +402,15 @@ impl IFileSystemProxyForLoader {
         cmif.result.into_result_with(|| ())
     }
 }
+impl From<RawHandle> for IFileSystemProxyForLoader {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+
 /// This struct is marked with sf::LargeData
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct Path {
     pub str: [u8; 769],
 }
@@ -397,7 +419,8 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<Path, [u8; 769]>;
 };
 
-#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub struct FileTimeStampRaw {
     pub create: i64,
     pub modify: i64,
@@ -413,12 +436,17 @@ const _: fn() = || {
 bitflags! {
     pub struct CreateOption : u32 { const BigFile = 0x1; }
 }
+#[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 pub enum QueryId {
     SetConcatenationFileAttribute = 0,
     UpdateMac = 1,
     IsSignedSystemPartitionOnSdCardValid = 2,
     QueryUnpreparedFileInformation = 3,
+}
+bitflags! {
+    pub struct OpenDirectoryMode : u32 { const ReadDirs = 0x1; const ReadFiles = 0x2;
+    const NoFileSize = 0x8000000; }
 }
 pub struct IFileSystem {
     pub(crate) handle: SessionHandle,
@@ -501,6 +529,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn delete_file(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -562,6 +591,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn create_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -623,6 +653,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn delete_directory(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -684,6 +715,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn delete_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -745,6 +777,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn rename_file(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -808,6 +841,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn rename_directory(&self, old_path: &Path, new_path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -871,6 +905,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn get_entry_type(&self, path: &Path) -> Result<u32> {
         let data_in = ();
         #[repr(packed)]
@@ -932,6 +967,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out)
     }
+
     pub fn open_file(&self, path: &Path, mode: u32) -> Result<IFile> {
         let data_in = mode;
         #[repr(packed)]
@@ -993,15 +1029,20 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 1);
         debug_assert_eq!(special_header.send_pid(), 0);
-        debug_assert_eq!(special_header.num_copy_handles(), 1);
-        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IFile {
             handle: SessionHandle(out),
         };
         cmif.result.into_result_with(|| out)
     }
-    pub fn open_directory(&self, path: &Path, mode: u32) -> Result<IDirectory> {
+
+    pub fn open_directory(
+        &self,
+        path: &Path,
+        mode: OpenDirectoryMode,
+    ) -> Result<IDirectory> {
         let data_in = mode;
         #[repr(packed)]
         struct Request {
@@ -1009,7 +1050,7 @@ impl IFileSystem {
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
-            raw_data: u32,
+            raw_data: OpenDirectoryMode,
             raw_data_word_padding: [u8; 0],
             post_padding: [u8; 16],
         }
@@ -1062,14 +1103,15 @@ impl IFileSystem {
         debug_assert_eq!(hipc.out_pointer_mode(), 0);
         debug_assert_eq!(hipc.has_special_header(), 1);
         debug_assert_eq!(special_header.send_pid(), 0);
-        debug_assert_eq!(special_header.num_copy_handles(), 1);
-        debug_assert_eq!(special_header.num_move_handles(), 0);
+        debug_assert_eq!(special_header.num_copy_handles(), 0);
+        debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IDirectory {
             handle: SessionHandle(out),
         };
         cmif.result.into_result_with(|| out)
     }
+
     pub fn commit(&self) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -1129,6 +1171,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn get_free_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
@@ -1190,6 +1233,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out)
     }
+
     pub fn get_total_space_size(&self, path: &Path) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
@@ -1251,6 +1295,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out)
     }
+
     pub fn clean_directory_recursively(&self, path: &Path) -> Result<()> {
         let data_in = ();
         #[repr(packed)]
@@ -1312,6 +1357,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| ())
     }
+
     pub fn get_file_time_stamp_raw(&self, path: &Path) -> Result<FileTimeStampRaw> {
         let data_in = ();
         #[repr(packed)]
@@ -1373,6 +1419,7 @@ impl IFileSystem {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         cmif.result.into_result_with(|| out)
     }
+
     pub fn query_entry(
         &self,
         out_buf: &mut [u8],
@@ -1445,11 +1492,151 @@ impl IFileSystem {
         cmif.result.into_result_with(|| ())
     }
 }
+impl From<RawHandle> for IFileSystem {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+
 pub struct IFile {
     pub(crate) handle: SessionHandle,
 }
 impl IFile {}
+impl From<RawHandle> for IFile {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+
 pub struct IDirectory {
     pub(crate) handle: SessionHandle,
 }
-impl IDirectory {}
+impl IDirectory {
+    pub fn read(&self, out_entries: &mut [u8]) -> Result<i64> {
+        let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            out_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 4],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 52]>;
+        unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 1, 0, 8, 0, 0, false),
+                    out_map_alias_desc_0: todo!(),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 0,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        crate::pre_ipc_hook();
+        horizon_svc::send_sync_request(self.handle.0)?;
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
+    }
+
+    pub fn get_entry_count(&self) -> Result<i64> {
+        let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 40]>;
+        unsafe impl IpcBufferRepr for Request {}
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        unsafe impl IpcBufferRepr for Response {}
+        unsafe {
+            ::core::ptr::write(
+                get_ipc_buffer_for(),
+                Request {
+                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 1,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        crate::pre_ipc_hook();
+        horizon_svc::send_sync_request(self.handle.0)?;
+        crate::post_ipc_hook();
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(get_ipc_buffer_for())
+        };
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        cmif.result.into_result_with(|| out)
+    }
+}
+impl From<RawHandle> for IDirectory {
+    fn from(h: RawHandle) -> Self {
+        Self { handle: SessionHandle(h) }
+    }
+}
+
