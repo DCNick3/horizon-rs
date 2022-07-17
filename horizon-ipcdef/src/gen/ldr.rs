@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
+use horizon_ipc::cmif::CommandType;
 use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle, SharedHandle};
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
@@ -115,7 +116,17 @@ impl<S: HandleStorage> IProcessManagerInterface<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, true),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        12,
+                        0,
+                        0,
+                        true,
+                    ),
                     special_header: HipcSpecialHeader::new(false, 1, 0),
                     handle_reslimit_h: reslimit_h,
                     pre_padding: Default::default(),
@@ -203,7 +214,17 @@ impl<S: HandleStorage> IProcessManagerInterface<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 3, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        12,
+                        3,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -279,7 +300,17 @@ impl<S: HandleStorage> IProcessManagerInterface<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 12, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        12,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -344,7 +375,17 @@ impl<S: HandleStorage> IProcessManagerInterface<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        10,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -409,7 +450,17 @@ impl<S: HandleStorage> IProcessManagerInterface<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 9, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        9,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,

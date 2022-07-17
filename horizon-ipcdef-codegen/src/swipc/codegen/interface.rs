@@ -125,6 +125,12 @@ fn imp_get_ipc_buffer_ptr() -> Tokens {
     quote!($imp)
 }
 
+fn imp_command_type() -> Tokens {
+    let imp = rust::import("horizon_ipc::cmif", "CommandType");
+
+    quote!($imp)
+}
+
 #[derive(Clone)]
 enum BufferSource {
     /// We have a byte slice in scope that should be converted to a buffer
@@ -1212,7 +1218,7 @@ fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens 
     let r: Tokens = quote! {
         Request {
             hipc: $(imp_hipc_header())::new(
-                $(CommandType::Request as u32),
+                $(imp_command_type())::Request,
                 $(in_pointer_buffers.len()),
                 $(in_map_aliases.len()),
                 $(out_map_aliases.len()),
@@ -1282,17 +1288,6 @@ fn make_request(ctx: &CodegenContext, w_info: &CommandWireFormatInfo) -> Tokens 
     };
 
     r
-}
-
-pub enum CommandType {
-    Invalid = 0,
-    LegacyRequest = 1,
-    Close = 2,
-    LegacyControl = 3,
-    Request = 4,
-    Control = 5,
-    RequestWithContext = 6,
-    ControlWithContext = 7,
 }
 
 fn make_command_body(

@@ -4,6 +4,7 @@ use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
+use horizon_ipc::cmif::CommandType;
 use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle, SharedHandle};
 use horizon_ipc::hipc::MapAliasBufferMode;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
@@ -143,7 +144,17 @@ impl<S: HandleStorage> IFileSystemProxy<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -288,7 +299,17 @@ impl<S: HandleStorage> IFileSystemProxyForLoader<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 10, 3, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        10,
+                        3,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -386,7 +407,17 @@ impl<S: HandleStorage> IFileSystemProxyForLoader<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        10,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -459,7 +490,17 @@ impl<S: HandleStorage> IFileSystemProxyForLoader<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 10, 0, 0, true),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        10,
+                        0,
+                        0,
+                        true,
+                    ),
                     special_header: HipcSpecialHeader::new(true, 0, 0),
                     pid_placeholder: 0,
                     pre_padding: Default::default(),
@@ -627,7 +668,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 12, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        12,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -698,7 +749,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -769,7 +830,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -840,7 +911,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -911,7 +992,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -989,7 +1080,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        2,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         old_path as *const _ as usize,
@@ -1066,7 +1167,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 2, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        2,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         old_path as *const _ as usize,
@@ -1142,7 +1253,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1215,7 +1336,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 9, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        9,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1304,7 +1435,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 9, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        9,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1386,7 +1527,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,
@@ -1452,7 +1603,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1523,7 +1684,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1594,7 +1765,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1671,7 +1852,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1750,7 +1941,17 @@ impl<S: HandleStorage> IFileSystem<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 1, 1, 1, 0, 9, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        1,
+                        1,
+                        1,
+                        0,
+                        9,
+                        0,
+                        0,
+                        false,
+                    ),
                     in_pointer_desc_0: HipcInPointerBufferDescriptor::new(
                         0,
                         path as *const _ as usize,
@@ -1888,7 +2089,17 @@ impl<S: HandleStorage> IDirectory<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 1, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        1,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     out_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
                         MapAliasBufferMode::Normal,
                         out_entries.as_ptr() as usize,
@@ -1958,7 +2169,17 @@ impl<S: HandleStorage> IDirectory<S> {
             ::core::ptr::write(
                 ipc_buffer_ptr as *mut _,
                 Request {
-                    hipc: HipcHeader::new(4, 0, 0, 0, 0, 8, 0, 0, false),
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
                     pre_padding: Default::default(),
                     cmif: CmifInHeader {
                         magic: CmifInHeader::MAGIC,

@@ -2,6 +2,7 @@ use super::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcMapAliasBufferDescriptor,
     HipcOutPointerBufferDescriptor, HipcSpecialHeader,
 };
+use crate::cmif::CommandType;
 use crate::conv_traits::{as_bytes_impl_transmute, from_bytes_impl_transmute};
 use crate::hipc::MapAliasBufferMode;
 
@@ -20,7 +21,7 @@ from_bytes_impl_transmute!(HipcMapAliasBufferDescriptor);
 impl HipcHeader {
     #[inline]
     pub fn new(
-        type_: u16,
+        type_: CommandType,
         num_in_pointers: u32,
         num_in_map_aliases: u32,
         num_out_map_aliases: u32,
@@ -33,7 +34,7 @@ impl HipcHeader {
         // TODO: make bitfield construction const
         Self {
             _bitfield_1: HipcHeader::new_bitfield_1(
-                type_,
+                type_ as u16,
                 num_in_pointers,
                 num_in_map_aliases,
                 num_out_map_aliases,

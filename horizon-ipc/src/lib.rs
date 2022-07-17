@@ -1,6 +1,9 @@
 #![no_std]
 #![deny(rust_2018_idioms)]
 
+#[cfg(not(feature = "rustc-dep-of-std"))]
+extern crate alloc;
+
 pub use horizon_svc::RawHandle;
 
 pub mod buffer;
