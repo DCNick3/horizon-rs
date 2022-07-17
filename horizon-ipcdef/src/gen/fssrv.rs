@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
-use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle, SharedHandle};
 use horizon_ipc::hipc::MapAliasBufferMode;
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
@@ -102,10 +102,16 @@ pub enum FileSystemType {
     ContentData = 6,
     ApplicationPackage = 7,
 }
-pub struct IFileSystemProxy {
-    pub(crate) handle: SessionHandle,
+pub struct IFileSystemProxy<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IFileSystemProxy {
+impl<S: HandleStorage> IFileSystemProxy<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn open_sd_card_file_system(&self) -> Result<IFileSystem> {
         let data_in = ();
         #[repr(packed)]
@@ -151,15 +157,18 @@ impl IFileSystemProxy {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystemProxy::OpenSdCardFileSystem",
+                *handle,
+            );
+        }
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -183,19 +192,26 @@ impl IFileSystemProxy {
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IFileSystem {
-            handle: SessionHandle(out),
+            handle: OwnedHandle::new(out),
         };
         Ok(out)
     }
 }
-impl From<RawHandle> for IFileSystemProxy {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IFileSystemProxy<OwnedHandle> {
+    pub fn as_ref(&self) -> IFileSystemProxy<RefHandle<'_>> {
+        IFileSystemProxy {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IFileSystemProxy<SharedHandle> {
+        IFileSystemProxy {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IFileSystemProxy {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IFileSystemProxy(0x{:x})", self.handle.0.0)
+        write!(f, "IFileSystemProxy({})", self.handle)
     }
 }
 
@@ -223,10 +239,16 @@ impl Default for CodeVerificationData {
     }
 }
 
-pub struct IFileSystemProxyForLoader {
-    pub(crate) handle: SessionHandle,
+pub struct IFileSystemProxyForLoader<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IFileSystemProxyForLoader {
+impl<S: HandleStorage> IFileSystemProxyForLoader<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn open_code_file_system(
         &self,
         path: &Path,
@@ -289,15 +311,18 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::OpenCodeFileSystem",
+                *handle,
+            );
+        }
         let Response {
             hipc,
             special_header,
@@ -327,7 +352,7 @@ impl IFileSystemProxyForLoader {
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out_verif = unsafe { out_verif.assume_init() };
         let out_fs = IFileSystem {
-            handle: SessionHandle(out_fs),
+            handle: OwnedHandle::new(out_fs),
         };
         Ok((out_fs, out_verif))
     }
@@ -375,15 +400,18 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::IsArchivedProgram",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -447,15 +475,18 @@ impl IFileSystemProxyForLoader {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystemProxyForLoader::SetCurrentProcess",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -472,14 +503,21 @@ impl IFileSystemProxyForLoader {
         Ok(())
     }
 }
-impl From<RawHandle> for IFileSystemProxyForLoader {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IFileSystemProxyForLoader<OwnedHandle> {
+    pub fn as_ref(&self) -> IFileSystemProxyForLoader<RefHandle<'_>> {
+        IFileSystemProxyForLoader {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IFileSystemProxyForLoader<SharedHandle> {
+        IFileSystemProxyForLoader {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IFileSystemProxyForLoader {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IFileSystemProxyForLoader(0x{:x})", self.handle.0.0)
+        write!(f, "IFileSystemProxyForLoader({})", self.handle)
     }
 }
 
@@ -533,10 +571,16 @@ bitflags! {
     #[derive(Default)] pub struct OpenFileMode : u32 { const Read = 0x1; const Write =
     0x2; const Append = 0x4; }
 }
-pub struct IFileSystem {
-    pub(crate) handle: SessionHandle,
+pub struct IFileSystem<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IFileSystem {
+impl<S: HandleStorage> IFileSystem<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn create_file(
         &self,
         path: &Path,
@@ -602,9 +646,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::CreateFile", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::CreateFile", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::CreateFile", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::CreateFile", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -670,9 +717,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::DeleteFile", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::DeleteFile", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::DeleteFile", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::DeleteFile", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -738,9 +788,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::CreateDirectory", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::CreateDirectory", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::CreateDirectory", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::CreateDirectory", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -806,9 +859,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::DeleteDirectory", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::DeleteDirectory", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::DeleteDirectory", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::DeleteDirectory", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -874,15 +930,18 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystem::DeleteDirectoryRecursively",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystem::DeleteDirectoryRecursively",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystem::DeleteDirectoryRecursively",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystem::DeleteDirectoryRecursively",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -954,9 +1013,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::RenameFile", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::RenameFile", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::RenameFile", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::RenameFile", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1028,9 +1090,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::RenameDirectory", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::RenameDirectory", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::RenameDirectory", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::RenameDirectory", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1096,9 +1161,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::GetEntryType", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::GetEntryType", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::GetEntryType", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::GetEntryType", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1166,9 +1234,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::OpenFile", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::OpenFile", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::OpenFile", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::OpenFile", *handle);
+        }
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1192,7 +1263,7 @@ impl IFileSystem {
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IFile {
-            handle: SessionHandle(out),
+            handle: OwnedHandle::new(out),
         };
         Ok(out)
     }
@@ -1252,9 +1323,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::OpenDirectory", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::OpenDirectory", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::OpenDirectory", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::OpenDirectory", *handle);
+        }
         let Response { hipc, special_header, handle_out: out, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1278,7 +1352,7 @@ impl IFileSystem {
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
         let out = IDirectory {
-            handle: SessionHandle(out),
+            handle: OwnedHandle::new(out),
         };
         Ok(out)
     }
@@ -1326,9 +1400,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::Commit", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::Commit", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::Commit", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::Commit", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1394,9 +1471,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::GetFreeSpaceSize", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1462,9 +1542,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::GetTotalSpaceSize", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1530,15 +1613,18 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "fssrv::IFileSystem::CleanDirectoryRecursively",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "fssrv::IFileSystem::CleanDirectoryRecursively",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "fssrv::IFileSystem::CleanDirectoryRecursively",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "fssrv::IFileSystem::CleanDirectoryRecursively",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1604,9 +1690,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::GetFileTimeStampRaw", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1690,9 +1779,12 @@ impl IFileSystem {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IFileSystem::QueryEntry", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IFileSystem::QueryEntry", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFileSystem::QueryEntry", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFileSystem::QueryEntry", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1709,36 +1801,63 @@ impl IFileSystem {
         Ok(())
     }
 }
-impl From<RawHandle> for IFileSystem {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IFileSystem<OwnedHandle> {
+    pub fn as_ref(&self) -> IFileSystem<RefHandle<'_>> {
+        IFileSystem {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IFileSystem<SharedHandle> {
+        IFileSystem {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IFileSystem {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IFileSystem(0x{:x})", self.handle.0.0)
+        write!(f, "IFileSystem({})", self.handle)
     }
 }
 
-pub struct IFile {
-    pub(crate) handle: SessionHandle,
+pub struct IFile<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IFile {}
-impl From<RawHandle> for IFile {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl<S: HandleStorage> IFile<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
+}
+impl IFile<OwnedHandle> {
+    pub fn as_ref(&self) -> IFile<RefHandle<'_>> {
+        IFile {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IFile<SharedHandle> {
+        IFile {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IFile {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IFile(0x{:x})", self.handle.0.0)
+        write!(f, "IFile({})", self.handle)
     }
 }
 
-pub struct IDirectory {
-    pub(crate) handle: SessionHandle,
+pub struct IDirectory<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IDirectory {
+impl<S: HandleStorage> IDirectory<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn read(&self, out_entries: &mut [DirectoryEntry]) -> Result<i64> {
         let data_in = ();
         #[repr(packed)]
@@ -1788,9 +1907,12 @@ impl IDirectory {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IDirectory::Read", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IDirectory::Read", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IDirectory::Read", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IDirectory::Read", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1850,9 +1972,12 @@ impl IDirectory {
                 },
             )
         };
-        crate::pre_ipc_hook("fssrv::IDirectory::GetEntryCount", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("fssrv::IDirectory::GetEntryCount", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IDirectory::GetEntryCount", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IDirectory::GetEntryCount", *handle);
+        }
         let Response { hipc, cmif, raw_data: out, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -1869,14 +1994,21 @@ impl IDirectory {
         Ok(out)
     }
 }
-impl From<RawHandle> for IDirectory {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IDirectory<OwnedHandle> {
+    pub fn as_ref(&self) -> IDirectory<RefHandle<'_>> {
+        IDirectory {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IDirectory<SharedHandle> {
+        IDirectory {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IDirectory {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IDirectory(0x{:x})", self.handle.0.0)
+        write!(f, "IDirectory({})", self.handle)
     }
 }
 

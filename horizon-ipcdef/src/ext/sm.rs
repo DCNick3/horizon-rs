@@ -2,7 +2,7 @@ use crate::gen::sm::IUserInterface;
 use crate::sm::ServiceName;
 use core::fmt::{Display, Formatter};
 use horizon_error::Result;
-use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::handle_storage::OwnedHandle;
 use horizon_svc::RawHandle;
 
 pub trait SmServiceType: From<RawHandle> {}
@@ -13,10 +13,10 @@ pub trait SmService {
 }
 
 impl IUserInterface {
-    pub fn new() -> Result<Self> {
+    pub fn open_named_port() -> Result<Self> {
         let handle = unsafe { horizon_svc::connect_to_named_port(b"sm:\0") }?;
         Ok(Self {
-            handle: SessionHandle(handle),
+            handle: OwnedHandle::new(handle),
         })
     }
 }

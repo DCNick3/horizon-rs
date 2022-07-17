@@ -2,7 +2,7 @@
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
-use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle, SharedHandle};
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{HipcHeader, HipcSpecialHeader};
 #[derive(Debug, Clone, Copy, Default)]
@@ -15,10 +15,16 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<ServiceName, [u8; 8]>;
 };
 
-pub struct IUserInterface {
-    pub(crate) handle: SessionHandle,
+pub struct IUserInterface<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IUserInterface {
+impl<S: HandleStorage> IUserInterface<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn initialize(&self) -> Result<()> {
         let data_in = 0u64;
         #[repr(packed)]
@@ -66,9 +72,12 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook("sm::IUserInterface::Initialize", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("sm::IUserInterface::Initialize", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("sm::IUserInterface::Initialize", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("sm::IUserInterface::Initialize", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -85,7 +94,7 @@ impl IUserInterface {
         Ok(())
     }
 
-    pub fn get_service(&self, name: ServiceName) -> Result<RawHandle> {
+    pub fn get_service(&self, name: ServiceName) -> Result<OwnedHandle> {
         let data_in = name;
         #[repr(packed)]
         struct Request {
@@ -130,9 +139,12 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook("sm::IUserInterface::GetService", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("sm::IUserInterface::GetService", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("sm::IUserInterface::GetService", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("sm::IUserInterface::GetService", *handle);
+        }
         let Response {
             hipc,
             special_header,
@@ -160,6 +172,7 @@ impl IUserInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let session_handle = OwnedHandle::new(session_handle);
         Ok(session_handle)
     }
 
@@ -168,7 +181,7 @@ impl IUserInterface {
         name: ServiceName,
         max_sessions: u32,
         is_light: bool,
-    ) -> Result<RawHandle> {
+    ) -> Result<OwnedHandle> {
         #[repr(C, packed)]
         struct In {
             pub name: ServiceName,
@@ -226,9 +239,12 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook("sm::IUserInterface::RegisterService", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("sm::IUserInterface::RegisterService", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("sm::IUserInterface::RegisterService", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("sm::IUserInterface::RegisterService", *handle);
+        }
         let Response {
             hipc,
             special_header,
@@ -256,6 +272,7 @@ impl IUserInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let port_handle = OwnedHandle::new(port_handle);
         Ok(port_handle)
     }
 
@@ -302,9 +319,12 @@ impl IUserInterface {
                 },
             )
         };
-        crate::pre_ipc_hook("sm::IUserInterface::UnregisterService", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("sm::IUserInterface::UnregisterService", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("sm::IUserInterface::UnregisterService", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("sm::IUserInterface::UnregisterService", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -321,14 +341,21 @@ impl IUserInterface {
         Ok(())
     }
 }
-impl From<RawHandle> for IUserInterface {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IUserInterface<OwnedHandle> {
+    pub fn as_ref(&self) -> IUserInterface<RefHandle<'_>> {
+        IUserInterface {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IUserInterface<SharedHandle> {
+        IUserInterface {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IUserInterface {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IUserInterface(0x{:x})", self.handle.0.0)
+        write!(f, "IUserInterface({})", self.handle)
     }
 }
 

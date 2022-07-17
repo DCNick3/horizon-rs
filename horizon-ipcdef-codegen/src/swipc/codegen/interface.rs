@@ -17,14 +17,32 @@ fn make_interface_reference(current_namespace: &Namespace, name: &NamespacedIden
     import_in(current_namespace, name)
 }
 
-fn imp_session_handle_ref() -> Tokens {
-    let imp = rust::import("horizon_ipc::cmif", "SessionHandleRef");
+fn imp_handle_storage() -> Tokens {
+    let imp = rust::import("horizon_ipc::handle_storage", "HandleStorage");
 
     quote!($imp)
 }
 
-fn imp_session_handle() -> Tokens {
-    let imp = rust::import("horizon_ipc::cmif", "SessionHandle");
+fn imp_owned_handle() -> Tokens {
+    let imp = rust::import("horizon_ipc::handle_storage", "OwnedHandle");
+
+    quote!($imp)
+}
+
+fn imp_ref_handle() -> Tokens {
+    let imp = rust::import("horizon_ipc::handle_storage", "RefHandle");
+
+    quote!($imp)
+}
+
+fn imp_shared_handle() -> Tokens {
+    let imp = rust::import("horizon_ipc::handle_storage", "SharedHandle");
+
+    quote!($imp)
+}
+
+fn imp_pooled_handle() -> Tokens {
+    let imp = rust::import("horizon_ipc::handle_storage", "PooledHandle");
 
     quote!($imp)
 }
@@ -156,7 +174,7 @@ struct HandleOut {
 }
 
 enum HandleTransformType {
-    RawValue,
+    Owned,
     Interface(NamespacedIdent),
 }
 
@@ -414,13 +432,13 @@ fn collect_command_info(
                 handles_out.push(HandleOut {
                     name: name.clone(),
                     transfer_type,
-                    transform: HandleTransformType::RawValue,
+                    transform: HandleTransformType::Owned,
                 });
 
                 results.push((
                     name,
                     quote! {
-                        $(imp_raw_handle())
+                        $(imp_owned_handle())
                     },
                 ));
             }
@@ -1333,9 +1351,12 @@ fn make_command_body(
             )
         };
 
-        crate::pre_ipc_hook($(quoted(fq_command_name)), self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook($(quoted(fq_command_name)), self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook($(quoted(fq_command_name)), *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook($(quoted(fq_command_name)), *handle);
+        }
 
         // SAFETY: The pointer should be valid
         let $(make_response_pattern(ctx, w_info))
@@ -1354,11 +1375,13 @@ fn make_command_body(
 
         $(for h in handles_out {
             $(match &h.transform {
-                HandleTransformType::RawValue => {},
+                HandleTransformType::Owned => {
+                    let $(h.name.as_str()) = $(imp_owned_handle())::new($(h.name.as_str()));
+                },
                 HandleTransformType::Interface(interface) => {
                     let $(h.name.as_str()) =
                         $(make_interface_reference(namespace, interface)) {
-                            handle: $(imp_session_handle())($(h.name.as_str()))
+                            handle: $(imp_owned_handle())::new($(h.name.as_str()))
                         };
                 }
             })
@@ -1428,28 +1451,41 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
     tok.push(
         namespace.clone(),
         quote! {
-            pub struct $name {
+            pub struct $name<S: $(imp_handle_storage()) = $(imp_owned_handle())> {
                 // the generated interface object owns the session handle!
-                pub(crate) handle: $(imp_session_handle()),
+                pub(crate) handle: S,
             }
 
-            impl $name {
+            impl<S: $(imp_handle_storage())> $name<S> {
+                pub fn new(handle: S) -> Self {
+                    Self { handle }
+                }
+
+                pub fn into_inner(self) -> S {
+                    self.handle
+                }
+
                 $(for command in i.commands.iter() join (_blank_!();) {
                     $(make_command(namespace, ctx, i, command, i.is_domain))
                 })
             }
 
-            impl From<$(imp_raw_handle())> for $name {
-                fn from(h: $(imp_raw_handle())) -> Self {
-                    Self {
-                        handle: $(imp_session_handle())(h)
+            impl $name<$(imp_owned_handle())> {
+                pub fn as_ref(&self) -> $name<$(imp_ref_handle())<'_>> {
+                    $name {
+                        handle: self.handle.as_ref()
+                    }
+                }
+                pub fn into_shared(self) -> $name<$(imp_shared_handle())> {
+                    $name {
+                        handle: $(imp_shared_handle())::new(self.handle.leak())
                     }
                 }
             }
 
             impl ::core::fmt::Debug for $name {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    write!(f, $[str]($[const](name)$[const]("(0x{:x})")), self.handle.0.0)
+                    write!(f, $[str]($[const](name)$[const]("({})")), self.handle)
                 }
             }
             _blank_!();

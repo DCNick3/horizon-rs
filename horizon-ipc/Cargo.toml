@@ -10,12 +10,13 @@ horizon-error = { path = "../horizon-error" }
 horizon-svc = { path = "../horizon-svc" }
 
 core = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-core' }
+alloc = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-alloc' }
 compiler_builtins = { version = "0.1.70", optional = true }
-
 
 [features]
 rustc-dep-of-std = [
     'core',
+    'alloc',
     'compiler_builtins',
     'horizon-svc/rustc-dep-of-std',
     'horizon-error/rustc-dep-of-std',

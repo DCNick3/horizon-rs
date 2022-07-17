@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;
-use horizon_ipc::cmif::SessionHandle;
+use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle, SharedHandle};
 use horizon_ipc::raw::cmif::{CmifInHeader, CmifOutHeader};
 use horizon_ipc::raw::hipc::{
     HipcHeader, HipcInPointerBufferDescriptor, HipcOutPointerBufferDescriptor,
@@ -56,16 +56,22 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<PinId, [u8; 8]>;
 };
 
-pub struct IProcessManagerInterface {
-    pub(crate) handle: SessionHandle,
+pub struct IProcessManagerInterface<S: HandleStorage = OwnedHandle> {
+    pub(crate) handle: S,
 }
-impl IProcessManagerInterface {
+impl<S: HandleStorage> IProcessManagerInterface<S> {
+    pub fn new(handle: S) -> Self {
+        Self { handle }
+    }
+    pub fn into_inner(self) -> S {
+        self.handle
+    }
     pub fn create_process(
         &self,
         id: PinId,
         flags: u32,
         reslimit_h: RawHandle,
-    ) -> Result<RawHandle> {
+    ) -> Result<OwnedHandle> {
         #[repr(C, packed)]
         struct In {
             pub flags: u32,
@@ -125,15 +131,15 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "ldr::IProcessManagerInterface::CreateProcess",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "ldr::IProcessManagerInterface::CreateProcess",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("ldr::IProcessManagerInterface::CreateProcess", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "ldr::IProcessManagerInterface::CreateProcess",
+                *handle,
+            );
+        }
         let Response {
             hipc,
             special_header,
@@ -161,6 +167,7 @@ impl IProcessManagerInterface {
         debug_assert_eq!(special_header.num_copy_handles(), 0);
         debug_assert_eq!(special_header.num_move_handles(), 1);
         debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        let proc_h = OwnedHandle::new(proc_h);
         Ok(proc_h)
     }
 
@@ -214,15 +221,18 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "ldr::IProcessManagerInterface::GetProgramInfo",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "ldr::IProcessManagerInterface::GetProgramInfo",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "ldr::IProcessManagerInterface::GetProgramInfo",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "ldr::IProcessManagerInterface::GetProgramInfo",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -283,9 +293,12 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook("ldr::IProcessManagerInterface::PinProgram", self.handle.0);
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook("ldr::IProcessManagerInterface::PinProgram", self.handle.0);
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("ldr::IProcessManagerInterface::PinProgram", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("ldr::IProcessManagerInterface::PinProgram", *handle);
+        }
         let Response { hipc, cmif, raw_data: out_id, .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -345,15 +358,12 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "ldr::IProcessManagerInterface::UnpinProgram",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "ldr::IProcessManagerInterface::UnpinProgram",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("ldr::IProcessManagerInterface::UnpinProgram", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("ldr::IProcessManagerInterface::UnpinProgram", *handle);
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -413,15 +423,18 @@ impl IProcessManagerInterface {
                 },
             )
         };
-        crate::pre_ipc_hook(
-            "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
-            self.handle.0,
-        );
-        horizon_svc::send_sync_request(self.handle.0)?;
-        crate::post_ipc_hook(
-            "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
-            self.handle.0,
-        );
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook(
+                "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
+                *handle,
+            );
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook(
+                "ldr::IProcessManagerInterface::SetEnabledProgramVerification",
+                *handle,
+            );
+        }
         let Response { hipc, cmif, raw_data: (), .. } = unsafe {
             ::core::ptr::read(ipc_buffer_ptr as *const _)
         };
@@ -438,14 +451,21 @@ impl IProcessManagerInterface {
         Ok(())
     }
 }
-impl From<RawHandle> for IProcessManagerInterface {
-    fn from(h: RawHandle) -> Self {
-        Self { handle: SessionHandle(h) }
+impl IProcessManagerInterface<OwnedHandle> {
+    pub fn as_ref(&self) -> IProcessManagerInterface<RefHandle<'_>> {
+        IProcessManagerInterface {
+            handle: self.handle.as_ref(),
+        }
+    }
+    pub fn into_shared(self) -> IProcessManagerInterface<SharedHandle> {
+        IProcessManagerInterface {
+            handle: SharedHandle::new(self.handle.leak()),
+        }
     }
 }
 impl ::core::fmt::Debug for IProcessManagerInterface {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        write!(f, "IProcessManagerInterface(0x{:x})", self.handle.0.0)
+        write!(f, "IProcessManagerInterface({})", self.handle)
     }
 }
 
