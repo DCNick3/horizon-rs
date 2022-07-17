@@ -144,7 +144,7 @@ pub fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     tok.push(
         namespace.clone(),
         quote! {
-            #[derive(Debug, Clone, Copy, Default)]
+            #[derive(Debug, Clone, Copy, Default, PartialEq)]
             #[repr($base_type)]
             pub enum $name {
                 $(for arm in e.arms.iter() {

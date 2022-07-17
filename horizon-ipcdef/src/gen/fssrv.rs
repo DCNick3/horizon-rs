@@ -63,14 +63,14 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<DirectoryEntry, [u8; 784]>;
 };
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[repr(u8)]
 pub enum DirectoryEntryType {
     #[default]
     Directory = 0,
     File = 1,
 }
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[repr(u32)]
 pub enum Partition {
     #[default]
@@ -89,7 +89,7 @@ pub enum Partition {
     SystemProperEncryption = 30,
     User = 31,
 }
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[repr(u32)]
 pub enum FileSystemType {
     #[default]
@@ -506,7 +506,7 @@ const _: fn() = || {
 bitflags! {
     #[derive(Default)] pub struct CreateOption : u32 { const BigFile = 0x1; }
 }
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[repr(u32)]
 pub enum QueryId {
     #[default]

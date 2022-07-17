@@ -1,6 +1,6 @@
 #![allow(unused_qualifications)]
 pub type ProgramId = u64;
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[repr(u8)]
 pub enum StorageId {
     #[default]
