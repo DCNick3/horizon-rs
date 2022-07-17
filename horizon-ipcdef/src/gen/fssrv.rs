@@ -13,7 +13,7 @@ use horizon_ipc::raw::hipc::{
 };
 use super::account::Uid;
 use super::ncm::ProgramId;
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct FsSaveDataCreationInfo {
     pub save_data_size: i64,
@@ -30,7 +30,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataCreationInfo, [u8; 64]>;
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct FsSaveDataAttribute {
     pub application_id: u64,
@@ -49,7 +49,7 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<FsSaveDataAttribute, [u8; 64]>;
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct DirectoryEntry {
     pub path: Path,
@@ -63,15 +63,17 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<DirectoryEntry, [u8; 784]>;
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum DirectoryEntryType {
+    #[default]
     Directory = 0,
     File = 1,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(u32)]
 pub enum Partition {
+    #[default]
     BootPartition1Root = 0,
     BootPartition2Root = 10,
     UserDataRoot = 20,
@@ -87,9 +89,10 @@ pub enum Partition {
     SystemProperEncryption = 30,
     User = 31,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(u32)]
 pub enum FileSystemType {
+    #[default]
     Invalid = 0,
     Invalid2 = 1,
     Logo = 2,
@@ -204,6 +207,16 @@ pub struct CodeVerificationData {
 const _: fn() = || {
     let _ = ::core::mem::transmute::<CodeVerificationData, [u8; 292]>;
 };
+impl Default for CodeVerificationData {
+    fn default() -> Self {
+        Self {
+            signature: [0; 256],
+            target_hash: [0; 32],
+            has_data: false,
+            reserved: [0; 3],
+        }
+    }
+}
 
 pub struct IFileSystemProxyForLoader {
     pub(crate) handle: SessionHandle,
@@ -470,8 +483,13 @@ pub struct Path {
 const _: fn() = || {
     let _ = ::core::mem::transmute::<Path, [u8; 769]>;
 };
+impl Default for Path {
+    fn default() -> Self {
+        Self { str: [0; 769] }
+    }
+}
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct FileTimeStampRaw {
     pub create: i64,
@@ -486,19 +504,20 @@ const _: fn() = || {
 };
 
 bitflags! {
-    pub struct CreateOption : u32 { const BigFile = 0x1; }
+    #[derive(Default)] pub struct CreateOption : u32 { const BigFile = 0x1; }
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(u32)]
 pub enum QueryId {
+    #[default]
     SetConcatenationFileAttribute = 0,
     UpdateMac = 1,
     IsSignedSystemPartitionOnSdCardValid = 2,
     QueryUnpreparedFileInformation = 3,
 }
 bitflags! {
-    pub struct OpenDirectoryMode : u32 { const ReadDirs = 0x1; const ReadFiles = 0x2;
-    const NoFileSize = 0x8000000; }
+    #[derive(Default)] pub struct OpenDirectoryMode : u32 { const ReadDirs = 0x1; const
+    ReadFiles = 0x2; const NoFileSize = 0x8000000; }
 }
 pub struct IFileSystem {
     pub(crate) handle: SessionHandle,

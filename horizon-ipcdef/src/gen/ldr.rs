@@ -29,8 +29,24 @@ pub struct ProgramInfo {
 const _: fn() = || {
     let _ = ::core::mem::transmute::<ProgramInfo, [u8; 1024]>;
 };
+impl Default for ProgramInfo {
+    fn default() -> Self {
+        Self {
+            main_thread_priority: 0,
+            default_cpu_id: 0,
+            flags: 0,
+            main_thread_stack_size: 0,
+            program_id: 0,
+            acid_sac_size: 0,
+            aci_sac_size: 0,
+            acid_fac_size: 0,
+            aci_fah_size: 0,
+            ac_buffer: [0; 992],
+        }
+    }
+}
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct PinId {
     pub value: u64,

@@ -1,3 +1,4 @@
+use crate::swipc::model::StructuralType;
 use crate::swipc::util::PaddingHelper;
 use crate::swipc::{
     codegen::{import_in, make_ident, TokenStorage, Tokens},
@@ -37,6 +38,40 @@ pub fn make_nominal_type(current_namespace: &Namespace, t: &NominalType) -> Toke
     }
 }
 
+fn make_manual_struct_default(ctx: &CodegenContext, s: &Struct) -> Tokens {
+    let mut padding_helper = PaddingHelper::new();
+
+    quote! {
+        impl Default for $(s.name.ident().as_str()) {
+            fn default() -> Self {
+                Self {
+                    $(for item in s.fields_layout(ctx).items {
+                        $(match item {
+                            FieldsLayoutItem::Padding(s) => {
+                                $(padding_helper.next_padding_name()): [0; $s],
+                            }
+                            FieldsLayoutItem::Field(_, i) => {
+                                $(s.fields[i].name.as_str()):
+                                $(match s.fields[i].ty.codegen_resolve(ctx) {
+                                    StructuralType::Int(_) => 0,
+                                    StructuralType::Bool => false,
+                                    StructuralType::F32 => 0.0,
+                                    StructuralType::Bytes { size, .. } => [0; $size],
+                                    StructuralType::Struct(_) | StructuralType::Enum(_) | StructuralType::Bitflags(_) => {
+                                        Default::default()
+                                    }
+                                    StructuralType::Unknown { .. } => todo!(),
+                                }),
+                            }
+                        })
+                    })
+                }
+            }
+        }
+    }
+    //
+}
+
 pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
     let name = make_ident(s.name.ident());
     let name = &name;
@@ -53,11 +88,26 @@ pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
 
     let mut padding_helper = PaddingHelper::new();
 
+    // rust's Default is implemented only for arrays with size <=33
+    // if we use bytes larger than that we must manually implement default
+    let should_use_manual_default = s.fields.iter().any(|f| {
+        let ty = f.ty.codegen_resolve(ctx);
+        if let StructuralType::Bytes { size, .. } = ty {
+            size > 33
+        } else {
+            false
+        }
+    });
+
     tok.push(
         namespace.clone(),
         quote! {
             $(if s.is_large_data { #[doc = " This struct is marked with sf::LargeData"] })
-            #[derive(Debug, Clone, Copy)]
+            #[derive(Debug, Clone, Copy
+                $(if !should_use_manual_default {
+                    , Default
+                })
+            )]
             #[repr(C)] // not packed, but we insert all necessary padding manually
             pub struct $name {
                 $(for f in s.fields_layout(ctx).items.iter() {
@@ -76,6 +126,10 @@ pub fn gen_struct(tok: &mut TokenStorage, ctx: &CodegenContext, s: &Struct) {
             _comment_!($(quoted(size_assert_comment)));
             const _: fn() = || { let _ = ::core::mem::transmute::<$name, [u8; $size]>; };
 
+            $(if should_use_manual_default {
+                $(make_manual_struct_default(ctx, s))
+            })
+
             _blank_!();
         },
     );
@@ -90,10 +144,11 @@ pub fn gen_enum(tok: &mut TokenStorage, _ctx: &CodegenContext, e: &Enum) {
     tok.push(
         namespace.clone(),
         quote! {
-            #[derive(Debug, Clone, Copy)]
+            #[derive(Debug, Clone, Copy, Default)]
             #[repr($base_type)]
             pub enum $name {
                 $(for arm in e.arms.iter() {
+                    $(if arm.value == 0 => #[default])
                     $(make_ident(&arm.name)) = $(arm.value),
                 })
             }
@@ -117,6 +172,7 @@ pub fn gen_bitflags(tok: &mut TokenStorage, _ctx: &CodegenContext, b: &Bitflags)
             // Furthermore, even if we feed some formatted input to it it butchers it, discarding any formatting information
             // I don't think it's possible to get nicer output using prettyplease without ditching bitflags! macro
             $bitflags_macro! {
+                #[derive(Default)]
                 pub struct $name : $base_type {
                     $(for arm in b.arms.iter() {
                         const $(make_ident(&arm.name)) = $(format!("{:#x}", arm.value));

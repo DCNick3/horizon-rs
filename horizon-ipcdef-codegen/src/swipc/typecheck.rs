@@ -151,6 +151,18 @@ impl Enum {
             }
         }
 
+        if arm_values.get(&0).is_none() {
+            // this is used as default value
+            res.push(
+                Diagnostic::error()
+                    .with_message(format!(
+                        "Enum `{}` should have an arm with value 0",
+                        self.name
+                    ))
+                    .with_primary_label(self.location),
+            );
+        }
+
         res
     }
 }
