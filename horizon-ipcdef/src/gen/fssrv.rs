@@ -63,14 +63,14 @@ const _: fn() = || {
     let _ = ::core::mem::transmute::<DirectoryEntry, [u8; 784]>;
 };
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum DirectoryEntryType {
     #[default]
     Directory = 0,
     File = 1,
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum Partition {
     #[default]
@@ -89,7 +89,7 @@ pub enum Partition {
     SystemProperEncryption = 30,
     User = 31,
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum FileSystemType {
     #[default]
@@ -516,7 +516,7 @@ const _: fn() = || {
 bitflags! {
     #[derive(Default)] pub struct CreateOption : u32 { const BigFile = 0x1; }
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum QueryId {
     #[default]
@@ -528,6 +528,10 @@ pub enum QueryId {
 bitflags! {
     #[derive(Default)] pub struct OpenDirectoryMode : u32 { const ReadDirs = 0x1; const
     ReadFiles = 0x2; const NoFileSize = 0x8000000; }
+}
+bitflags! {
+    #[derive(Default)] pub struct OpenFileMode : u32 { const Read = 0x1; const Write =
+    0x2; const Append = 0x4; }
 }
 pub struct IFileSystem {
     pub(crate) handle: SessionHandle,
@@ -1111,7 +1115,7 @@ impl IFileSystem {
         Ok(out)
     }
 
-    pub fn open_file(&self, path: &Path, mode: u32) -> Result<IFile> {
+    pub fn open_file(&self, path: &Path, mode: OpenFileMode) -> Result<IFile> {
         let data_in = mode;
         #[repr(packed)]
         struct Request {
@@ -1119,7 +1123,7 @@ impl IFileSystem {
             in_pointer_desc_0: HipcInPointerBufferDescriptor,
             pre_padding: [u8; 0],
             cmif: CmifInHeader,
-            raw_data: u32,
+            raw_data: OpenFileMode,
             raw_data_word_padding: [u8; 0],
             post_padding: [u8; 16],
         }

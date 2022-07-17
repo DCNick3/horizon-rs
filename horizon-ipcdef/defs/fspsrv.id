@@ -153,6 +153,15 @@ bitflags fssrv::OpenDirectoryMode : u32 {
     NoFileSize = 0x8000000,
 }
 
+bitflags fssrv::OpenFileMode : u32 {
+    /// Open for reading.
+    Read   = 0x1,
+    /// Open for writing.
+    Write  = 0x2,
+    /// Append file.
+    Append = 0x4,
+}
+
 interface fssrv::IFileSystem {
     [0] CreateFile(fssrv::Path path, i64 size, fssrv::CreateOption option);
     [1] DeleteFile(fssrv::Path path);
@@ -162,7 +171,10 @@ interface fssrv::IFileSystem {
     [5] RenameFile(fssrv::Path old_path, fssrv::Path new_path);
     [6] RenameDirectory(fssrv::Path old_path, fssrv::Path new_path);
     [7] GetEntryType(sf::Out<u32> out, fssrv::Path path);
-    [8] OpenFile(sf::Out<sf::SharedPointer<fssrv::IFile>> out, fssrv::Path path, u32 mode);
+    [8] OpenFile(
+        sf::Out<sf::SharedPointer<fssrv::IFile>> out,
+        fssrv::Path path,
+        fssrv::OpenFileMode mode);
     [9] OpenDirectory(
         sf::Out<sf::SharedPointer<fssrv::IDirectory>> out,
         fssrv::Path path,
