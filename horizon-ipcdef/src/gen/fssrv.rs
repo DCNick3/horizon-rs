@@ -193,6 +193,11 @@ impl From<RawHandle> for IFileSystemProxy {
         Self { handle: SessionHandle(h) }
     }
 }
+impl ::core::fmt::Debug for IFileSystemProxy {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IFileSystemProxy(0x{:x})", self.handle.0.0)
+    }
+}
 
 /// This struct is marked with sf::LargeData
 #[derive(Debug, Clone, Copy)]
@@ -470,6 +475,11 @@ impl IFileSystemProxyForLoader {
 impl From<RawHandle> for IFileSystemProxyForLoader {
     fn from(h: RawHandle) -> Self {
         Self { handle: SessionHandle(h) }
+    }
+}
+impl ::core::fmt::Debug for IFileSystemProxyForLoader {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IFileSystemProxyForLoader(0x{:x})", self.handle.0.0)
     }
 }
 
@@ -1700,6 +1710,11 @@ impl From<RawHandle> for IFileSystem {
         Self { handle: SessionHandle(h) }
     }
 }
+impl ::core::fmt::Debug for IFileSystem {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IFileSystem(0x{:x})", self.handle.0.0)
+    }
+}
 
 pub struct IFile {
     pub(crate) handle: SessionHandle,
@@ -1708,6 +1723,11 @@ impl IFile {}
 impl From<RawHandle> for IFile {
     fn from(h: RawHandle) -> Self {
         Self { handle: SessionHandle(h) }
+    }
+}
+impl ::core::fmt::Debug for IFile {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IFile(0x{:x})", self.handle.0.0)
     }
 }
 
@@ -1848,6 +1868,11 @@ impl IDirectory {
 impl From<RawHandle> for IDirectory {
     fn from(h: RawHandle) -> Self {
         Self { handle: SessionHandle(h) }
+    }
+}
+impl ::core::fmt::Debug for IDirectory {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IDirectory(0x{:x})", self.handle.0.0)
     }
 }
 

@@ -443,4 +443,9 @@ impl From<RawHandle> for IProcessManagerInterface {
         Self { handle: SessionHandle(h) }
     }
 }
+impl ::core::fmt::Debug for IProcessManagerInterface {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IProcessManagerInterface(0x{:x})", self.handle.0.0)
+    }
+}
 

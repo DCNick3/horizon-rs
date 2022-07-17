@@ -326,4 +326,9 @@ impl From<RawHandle> for IUserInterface {
         Self { handle: SessionHandle(h) }
     }
 }
+impl ::core::fmt::Debug for IUserInterface {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        write!(f, "IUserInterface(0x{:x})", self.handle.0.0)
+    }
+}
 

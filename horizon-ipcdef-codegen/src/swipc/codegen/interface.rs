@@ -1446,6 +1446,12 @@ pub fn gen_interface(tok: &mut TokenStorage, ctx: &CodegenContext, i: &Interface
                     }
                 }
             }
+
+            impl ::core::fmt::Debug for $name {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    write!(f, $[str]($[const](name)$[const]("(0x{:x})")), self.handle.0.0)
+                }
+            }
             _blank_!();
         },
     );
