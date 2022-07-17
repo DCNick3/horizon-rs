@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 pub trait Writer {
     fn write_bytes(&mut self, data: &[u8]);
     /// Align the buffer to [alignment] bytes, return number of alignment bytes inserted
@@ -45,25 +43,6 @@ impl Writer for CountingWriter {
         let need_align = new_len - self.0;
 
         self.0 = new_len;
-        need_align
-    }
-}
-
-impl Writer for Vec<u8> {
-    #[inline]
-    fn write_bytes(&mut self, data: &[u8]) {
-        self.extend_from_slice(data)
-    }
-
-    #[inline]
-    fn align(&mut self, alignment: usize) -> usize {
-        let new_len = ((self.len() + alignment - 1) / alignment) * alignment;
-        let need_align = new_len - self.len();
-
-        for _ in 0..need_align {
-            self.push(0)
-        }
-
         need_align
     }
 }
