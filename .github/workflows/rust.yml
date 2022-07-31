@@ -1,0 +1,27 @@
+name: Build Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        target: aarch64-unknown-none
+    - name: Build
+      run: cargo build --verbose --workspace --exclude horizon-ipcdef-codegen --exclude horizon-svc-codegen
