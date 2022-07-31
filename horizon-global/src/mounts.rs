@@ -93,6 +93,17 @@ impl Mount {
     fn is_empty(&self) -> bool {
         self.name[0] == 0
     }
+
+    #[inline]
+    fn into_inner(mut self) -> MountDevice<OwnedHandle> {
+        // we can't just move out of `self` because it implements Drop
+        // so we do it in a roundabout way
+        // SAFETY: we do not use the `ManuallyDrop` again because we immediately forget the struct it is contained in
+        let device = unsafe { ManuallyDrop::take(&mut self.device) };
+        core::mem::forget(self);
+
+        device
+    }
 }
 
 impl Default for Mount {
@@ -183,11 +194,11 @@ fn add_impl(
 
     Ok(())
 }
-fn remove_impl(mounts: &mut Mounts, name: &str) -> Option<()> {
+fn remove_impl(mounts: &mut Mounts, name: &str) -> Option<MountDevice<OwnedHandle>> {
     if let Some((p, _)) = find_impl(&mounts, name) {
-        mounts[p] = Mount::empty();
+        let old: Mount = core::mem::replace(&mut mounts[p], Mount::empty());
 
-        Some(())
+        Some(old.into_inner())
     } else {
         None
     }
@@ -278,7 +289,7 @@ impl WriteGuard {
     ///
     /// # Errors
     /// * Returns None if mountpoint with a specified name does not exist
-    pub fn remove(&mut self, name: &str) -> Option<()> {
+    pub fn remove(&mut self, name: &str) -> Option<MountDevice<OwnedHandle>> {
         remove_impl(&mut *self.guard, name)
     }
 }
