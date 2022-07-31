@@ -1,6 +1,6 @@
 use crate::cmif::control::{clone_object, close_object};
 use alloc::boxed::Box;
-use core::fmt::{Display, Formatter};
+use core::fmt::{Debug, Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::NonNull;
@@ -41,15 +41,18 @@ pub struct OwnedHandle {
 }
 
 impl OwnedHandle {
-    pub fn new(handle: RawHandle) -> Self {
+    #[inline]
+    pub const fn new(handle: RawHandle) -> Self {
         Self { handle }
     }
+    #[inline]
     pub fn as_ref(&self) -> RefHandle<'_> {
         RefHandle {
             handle: self.handle,
             phantom: PhantomData::default(),
         }
     }
+    #[inline]
     pub fn leak(self) -> RawHandle {
         self.handle
     }
@@ -58,6 +61,12 @@ impl OwnedHandle {
 impl Drop for OwnedHandle {
     fn drop(&mut self) {
         close_object(self.handle)
+    }
+}
+
+impl Debug for OwnedHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "OwnedHandle({})", self)
     }
 }
 
@@ -83,9 +92,29 @@ impl HandleStorage for OwnedHandle {
     fn give_back(&self, _: &HandleRef<'_, Self>) {}
 }
 
+#[derive(Copy, Clone)]
 pub struct RefHandle<'a> {
     handle: RawHandle,
     phantom: PhantomData<&'a ()>,
+}
+
+impl RefHandle<'_> {
+    /// Create a new RefHandle from a raw handle
+    ///
+    /// It's caller's responsibility to ensure that the lifetime of the handle is correct
+    #[inline]
+    pub const fn new(handle: RawHandle) -> Self {
+        Self {
+            handle,
+            phantom: PhantomData {},
+        }
+    }
+}
+
+impl Debug for RefHandle<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "RefHandle({})", self)
+    }
 }
 
 impl Display for RefHandle<'_> {
@@ -134,6 +163,12 @@ impl SharedHandle {
 
 unsafe impl Send for SharedHandle {}
 unsafe impl Sync for SharedHandle {}
+
+impl Debug for SharedHandle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "SharedHandle({})", self)
+    }
+}
 
 impl Display for SharedHandle {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
