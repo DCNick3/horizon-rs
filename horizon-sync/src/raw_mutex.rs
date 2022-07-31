@@ -38,11 +38,13 @@ pub fn futex_wake(futex: &AtomicI32) {
     }
 }
 
-/// This is basically a mutex2 from "Futexes Are Tricky" (https://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf)
-/// svc::wait_for_address and svc::signal_to_address can be easily used to implement futex-like functionality
-/// though it's [4.0.0+]
-///
 /// The implementation is taken from new rust stdlib mutex based on futex
+///
+/// svc::wait_for_address and svc::signal_to_address can be easily used to implement futex-like functionality
+///
+/// It makes this mutex `[4.0.0+]`, but it should be fine with mesosphere
+///
+/// Some details on how it works can be found in "Futexes Are Tricky" (<https://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf>)
 pub struct RawMutex {
     /// 0: unlocked
     /// 1: locked, no other threads waiting

@@ -57,7 +57,8 @@ bitflags! {
 }
 
 /// Used in [get_info] svc
-/// https://switchbrew.org/wiki/SVC#InfoType
+///
+/// See <https://switchbrew.org/wiki/SVC#InfoType>
 pub enum InfoType {
     CoreMask,
     PriorityMask,
@@ -211,7 +212,10 @@ pub fn send_sync_request(session_handle: RawHandle) -> Result<()> {
         .into_result(())
 }
 
-/// [buffer] must be 0x1000-aligned
+/// Sends an IPC request like `send_sync_request` but uses a user-supplied buffer instead
+///
+/// `buffer` must be 0x1000-aligned
+///
 /// NOTICE: yuzu does not support this svc yet =(
 pub fn send_sync_request_with_user_buffer(buffer: &[u8], session_handle: RawHandle) -> Result<()> {
     unsafe {

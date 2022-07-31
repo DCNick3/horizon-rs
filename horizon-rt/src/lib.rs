@@ -1,4 +1,6 @@
-//! Crate that implements the low-level startup code - the first thing that runs in your process
+//! This care implements the low-level startup code for horizon OS processes'
+//!
+//! It is the first thing that would run in your process
 //!
 //! You probably don't want to directly depend on it, libstd already should do this for you
 

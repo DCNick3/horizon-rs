@@ -1,3 +1,5 @@
+//! Provides definitions & client implementations for various horizon sysmodules
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod ext;

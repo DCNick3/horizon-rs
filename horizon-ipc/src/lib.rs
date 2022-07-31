@@ -1,3 +1,5 @@
+//! Provides low-level primitives used to implement IPC clients for horizon sysmodules
+
 #![no_std]
 #![deny(rust_2018_idioms)]
 

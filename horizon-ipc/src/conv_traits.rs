@@ -1,6 +1,6 @@
 pub trait Writer {
     fn write_bytes(&mut self, data: &[u8]);
-    /// Align the buffer to [alignment] bytes, return number of alignment bytes inserted
+    /// Align the buffer to specified alignment, return number of alignment bytes inserted
     fn align(&mut self, alignment: usize) -> usize;
 
     fn write(&mut self, data: &(impl WriteAsBytes + ?Sized)) {
@@ -11,7 +11,7 @@ pub trait Writer {
 pub trait Reader<'d> {
     fn read_bytes(&mut self, size: usize) -> &'d [u8];
 
-    /// Align the buffer to [alignment] bytes, return number of alignment bytes inserted
+    /// Align the buffer to specified alignment, return number of alignment bytes inserted
     fn align(&mut self, alignment: usize) -> usize;
 
     fn read<T: ReadFromBytes<'d>>(&mut self) -> T {

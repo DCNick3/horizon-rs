@@ -1,4 +1,4 @@
-//! This a vendored copy of https://github.com/DrChat/buddyalloc/blob/4fd906fd901da8161c9257942782e6bf899bc0eb/src/heap.rs
+//! This a vendored copy of <https://github.com/DrChat/buddyalloc/blob/4fd906fd901da8161c9257942782e6bf899bc0eb/src/heap.rs>
 //!
 //! A simple heap based on a buddy allocator.  For the theory of buddy
 //! allocators, see <https://en.wikipedia.org/wiki/Buddy_memory_allocation>
