@@ -26,6 +26,8 @@ static mut MEMORY_MAP: MaybeUninit<MemoryMap> = MaybeUninit::uninit();
 
 // TODO: store memory reservations. need locks and (maybe) allocation
 
+/// Initialize the virtual memory map
+///
 /// # Safety
 ///
 /// Must be called only once

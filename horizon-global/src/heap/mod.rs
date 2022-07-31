@@ -18,6 +18,8 @@ const BUDDY_LEVELS: usize = 21;
 
 static mut BUDDY_ALLOCATOR: MaybeUninit<Mutex<buddy::Heap<BUDDY_LEVELS>>> = MaybeUninit::uninit();
 
+/// Initialize the heap
+///
 /// # Safety
 ///
 /// Must be called only once

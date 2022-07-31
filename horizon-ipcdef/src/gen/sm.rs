@@ -1,4 +1,5 @@
 #![allow(unused_qualifications)]
+ij_core_workaround!();
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
 use horizon_ipc::buffer::get_ipc_buffer_ptr;

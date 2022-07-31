@@ -4,6 +4,8 @@
 //! This is fairly easy to accomplish on aarch64, but I don't think it's easy to enforce that
 //! So things will silently break if it doesn't go according to plan (whoops)
 
+ij_core_workaround!();
+
 use crate::rt_abort::{rt_abort, RtAbortReason};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

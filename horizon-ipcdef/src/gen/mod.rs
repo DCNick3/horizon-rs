@@ -5,6 +5,7 @@
     dead_code,
     clippy::all,
 )]
+ij_core_workaround!();
 pub mod account;
 pub mod fssrv;
 pub mod ldr;

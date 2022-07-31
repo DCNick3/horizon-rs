@@ -2,7 +2,7 @@ use crate::buffer::get_ipc_buffer_ptr;
 use crate::cmif::CommandType;
 use crate::raw::cmif::{CmifInHeader, CmifOutHeader};
 use crate::raw::hipc::HipcHeader;
-use horizon_error::Result;
+use horizon_error::{ErrorCode, Result};
 use horizon_svc::RawHandle;
 
 pub fn clone_object(_handle: RawHandle) -> RawHandle {
@@ -56,6 +56,7 @@ fn send_close_request(handle: RawHandle) -> Result<()> {
     debug_assert_eq!(hipc.out_pointer_mode(), 0);
     debug_assert_eq!(hipc.has_special_header(), 0);
     debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+    debug_assert_eq!(cmif.result, ErrorCode::new(0));
     Ok(())
 }
 

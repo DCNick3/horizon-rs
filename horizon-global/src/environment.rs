@@ -34,6 +34,8 @@ pub struct Environment {
 
 static mut ENVIRONMENT: MaybeUninit<Environment> = MaybeUninit::uninit();
 
+/// Initialize the environment
+///
 /// # Safety
 ///
 /// Must be called exactly once (you HAVE to call it before using get)

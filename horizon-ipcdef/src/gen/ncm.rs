@@ -1,4 +1,5 @@
 #![allow(unused_qualifications)]
+ij_core_workaround!();
 pub type ProgramId = u64;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u8)]

@@ -1,4 +1,5 @@
 #![allow(unused_qualifications)]
+ij_core_workaround!();
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct Uid {

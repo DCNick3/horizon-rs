@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use core::arch::asm;
 
 #[inline(always)]

@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use bitflags::bitflags;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

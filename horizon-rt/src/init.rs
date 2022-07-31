@@ -1,10 +1,15 @@
+ij_core_workaround!();
+
 use crate::hbl::AbiConfigEntry;
 use crate::{rt_abort, RtAbortReason};
 use horizon_error::Result;
 use horizon_global::environment::{Environment, EnvironmentType, HorizonVersion};
+use horizon_global::mounts::MountDevice;
 use horizon_global::virtual_memory::{MemoryMap, MemoryRegion};
+use horizon_ipcdef::sm::{IUserInterface, ServiceName};
 use horizon_svc::{InfoType, CURRENT_PROCESS_PSEUDO_HANDLE};
 
+use crate::rt_abort::rt_unwrap;
 use horizon_svc as svc;
 
 fn get_memory_region(start_info: InfoType, size_info: InfoType) -> Result<MemoryRegion> {
@@ -102,10 +107,7 @@ pub unsafe fn init(
 
     // TODO: store the _saver_lr somewhere (in case of Nro env) so that we can return to loader later
 
-    let memory_map = match get_memory_map() {
-        Ok(m) => m,
-        Err(_) => rt_abort(RtAbortReason::MemoryMapReadFailed),
-    };
+    let memory_map = rt_unwrap(get_memory_map(), RtAbortReason::MemoryMapReadFailed);
 
     // TODO: BAD BAD BAD
     // here we align the heap size to the nearest power of two, because this buddy allocator can't handle it
@@ -128,7 +130,32 @@ pub unsafe fn init(
         (addr, size)
     };
 
+    let sm_session = rt_unwrap(
+        IUserInterface::open_named_port(),
+        RtAbortReason::SmOpenNamedPortFailed,
+    );
+
+    rt_unwrap(sm_session.initialize(), RtAbortReason::SmInitializeFailed);
+
+    let fs_session = rt_unwrap(
+        sm_session.get_service(ServiceName::try_new("fsp-srv").unwrap_unchecked()),
+        RtAbortReason::FsOpenFailed,
+    );
+    let fs_session = horizon_ipcdef::fssrv::IFileSystemProxy::new(fs_session);
+
+    let sd_fs = rt_unwrap(
+        fs_session.open_sd_card_file_system(),
+        RtAbortReason::SdFsOpenFailed,
+    );
+
     horizon_global::environment::init(environment);
     horizon_global::virtual_memory::init(memory_map);
     horizon_global::heap::init(heap.0, heap.1);
+    horizon_global::mounts::init();
+    horizon_global::sm_session::init(sm_session.into_inner());
+
+    rt_unwrap(
+        horizon_global::mounts::write().add("sdmc", MountDevice::IFileSystem(sd_fs.into_inner())),
+        RtAbortReason::SdFsMountFailed,
+    );
 }

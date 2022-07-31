@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use crate::fssrv::Path;
 use core::str::Utf8Error;
 
@@ -5,13 +7,19 @@ const PATH_SIZE: usize = 0x300;
 
 impl Path {
     pub fn new(s: impl AsRef<[u8]>) -> Self {
+        Self::try_new(s).expect("Path was too big to fit into a buffer")
+    }
+
+    pub fn try_new(s: impl AsRef<[u8]>) -> Option<Self> {
         let s = s.as_ref();
         let mut r = Self { str: [0; 0x301] };
 
-        assert!(s.len() <= PATH_SIZE);
+        if s.len() > PATH_SIZE {
+            return None;
+        }
         r.str[..s.len()].copy_from_slice(s);
 
-        r
+        Some(r)
     }
 
     pub fn as_str(&self) -> Result<&str, Utf8Error> {

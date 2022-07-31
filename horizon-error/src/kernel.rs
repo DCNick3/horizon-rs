@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use crate::ErrorCodeModule;
 
 // TODO: refine and export as a macro for defining an error code module

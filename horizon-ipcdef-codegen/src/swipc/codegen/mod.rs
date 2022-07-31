@@ -188,6 +188,7 @@ impl TokenStorage {
                                 dead_code,              // probably forever, because of 'field is never read' diags on request structs
                                 clippy::all,            // probably forever
                             )]
+                            ij_core_workaround!();
                             {}"},
                         contents
                     )
@@ -198,6 +199,7 @@ impl TokenStorage {
                             unused_qualifications,  // forever, because we use ::core::* for less ambiguity
                                                     // (included in all files to make clion happy)
                         )]
+                        ij_core_workaround!();
                         {}"},
                         contents
                     )

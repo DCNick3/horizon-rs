@@ -3,6 +3,8 @@
 #![cfg_attr(feature = "rustc-dep-of-std", feature(no_core), no_core)]
 
 #[cfg(feature = "rustc-dep-of-std")]
+#[allow(unused_imports)]
+#[macro_use]
 extern crate rustc_std_workspace_core as core;
 
 #[cfg(not(feature = "rustc-dep-of-std"))]
@@ -27,6 +29,7 @@ macro_rules! ij_core_workaround {
 pub mod environment;
 pub mod heap;
 pub mod mounts;
+pub mod sm_session;
 pub mod virtual_memory;
 
 #[no_mangle]

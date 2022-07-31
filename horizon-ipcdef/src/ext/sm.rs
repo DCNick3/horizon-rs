@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use crate::gen::sm::IUserInterface;
 use crate::sm::ServiceName;
 use core::fmt::{Display, Formatter};

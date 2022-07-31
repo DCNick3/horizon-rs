@@ -1,4 +1,5 @@
 #![allow(unused_qualifications)]
+ij_core_workaround!();
 use bitflags::bitflags;
 use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};

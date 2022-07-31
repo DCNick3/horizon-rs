@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use core::arch::asm;
 // use horizon_error::ErrorCode;
 // use horizon_svc::BreakReason;
@@ -17,6 +19,11 @@ pub enum RtAbortReason {
     NoMainThreadHandleInNsoEnv,
     MemoryMapReadFailed,
     MakeHeapFailed,
+    SmOpenNamedPortFailed,
+    SmInitializeFailed,
+    FsOpenFailed,
+    SdFsOpenFailed,
+    SdFsMountFailed,
 }
 
 // const MODULE_CODE: u32 = 390; // TODO: need to to talk to people how to select this number
@@ -42,4 +49,12 @@ pub fn rt_abort(reason: RtAbortReason) -> ! {
     //
     // I don't think we should survive beyond the abort
     unsafe { horizon_svc::exit_process() }
+}
+
+#[inline(never)]
+pub fn rt_unwrap<T, E>(result: core::result::Result<T, E>, reason: RtAbortReason) -> T {
+    match result {
+        Ok(v) => v,
+        Err(_) => rt_abort(reason),
+    }
 }

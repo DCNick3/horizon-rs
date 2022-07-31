@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use horizon_svc::RawHandle;
 use std::fmt::{Display, Formatter};
 

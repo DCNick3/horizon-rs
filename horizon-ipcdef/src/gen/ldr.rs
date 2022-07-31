@@ -1,4 +1,5 @@
 #![allow(unused_qualifications)]
+ij_core_workaround!();
 use core::mem::MaybeUninit;
 use horizon_error::{ErrorCode, Result};
 use horizon_ipc::RawHandle;
