@@ -191,8 +191,45 @@ interface fssrv::IFileSystem {
         fssrv::Path path);
 }
 
-interface fssrv::IFile {
+bitflags fssrv::ReadOption : u32 {
+}
 
+bitflags fssrv::WriteOption : u32 {
+    Flush = 1,
+}
+
+struct fssrv::FileQueryRangeInfo {
+    u32 aes_ctr_key_type;
+    u32 speed_emulation_type;
+    sf::Bytes<0x38> reserved;
+}
+
+enum fssrv::OperationId : u32 {
+    Clear               = 0,
+    ClearSignature      = 1,
+    InvalidateCache     = 2,
+    QueryRange          = 3,
+}
+
+interface fssrv::IFile {
+    [0] Read(sf::Out<i64> out, i64 offset, sf::OutNonSecureBuffer buffer, i64 size, fssrv::ReadOption option);
+    [1] Write(i64 offset, sf::InNonSecureBuffer buffer, i64 size, fssrv::WriteOption option);
+    [2] Flush();
+    [3] SetSize(i64 size);
+    [4] GetSize(sf::Out<i64> size);
+    [5] OperateRange(
+        sf::Out<fssrv::FileQueryRangeInfo> out,
+        fssrv::OperationId op_id,
+        i64 offset,
+        i64 size
+    );
+    [6] OperateRangeWithBuffer(
+        sf::OutNonSecureBuffer out_buf,
+        sf::InNonSecureBuffer in_buf,
+        fssrv::OperationId op_id,
+        i64 offset,
+        i64 size
+    );
 }
 
 interface fssrv::IDirectory {

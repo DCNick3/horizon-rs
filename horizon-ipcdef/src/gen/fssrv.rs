@@ -2021,6 +2021,42 @@ impl ::core::fmt::Debug for IFileSystem {
     }
 }
 
+bitflags! {
+    #[derive(Default)] pub struct ReadOption : u32 {}
+}
+bitflags! {
+    #[derive(Default)] pub struct WriteOption : u32 { const Flush = 0x1; }
+}
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct FileQueryRangeInfo {
+    pub aes_ctr_key_type: u32,
+    pub speed_emulation_type: u32,
+    pub reserved: [u8; 56],
+}
+// Static size check for FileQueryRangeInfo (expect 64 bytes)
+const _: fn() = || {
+    let _ = ::core::mem::transmute::<FileQueryRangeInfo, [u8; 64]>;
+};
+impl Default for FileQueryRangeInfo {
+    fn default() -> Self {
+        Self {
+            aes_ctr_key_type: 0,
+            speed_emulation_type: 0,
+            reserved: [0; 56],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum OperationId {
+    #[default]
+    Clear = 0,
+    ClearSignature = 1,
+    InvalidateCache = 2,
+    QueryRange = 3,
+}
 pub struct IFile<S: HandleStorage = OwnedHandle> {
     pub(crate) handle: S,
 }
@@ -2030,6 +2066,630 @@ impl<S: HandleStorage> IFile<S> {
     }
     pub fn into_inner(self) -> S {
         self.handle
+    }
+    pub fn read(
+        &self,
+        offset: i64,
+        buffer: &mut [u8],
+        size: i64,
+        option: ReadOption,
+    ) -> Result<i64> {
+        #[repr(C, packed)]
+        struct In {
+            pub option: ReadOption,
+            pub _padding_0: [u8; 4],
+            pub offset: i64,
+            pub size: i64,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 24]>;
+        let data_in: In = In {
+            option,
+            offset,
+            size,
+            _padding_0: Default::default(),
+        };
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            out_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: In,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 4],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 76]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        1,
+                        0,
+                        14,
+                        0,
+                        0,
+                        false,
+                    ),
+                    out_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        buffer.as_ptr() as usize,
+                        ::core::mem::size_of_val(buffer),
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 0,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::Read", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::Read", *handle);
+        }
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(out)
+    }
+
+    pub fn write(
+        &self,
+        offset: i64,
+        buffer: &[u8],
+        size: i64,
+        option: WriteOption,
+    ) -> Result<()> {
+        #[repr(C, packed)]
+        struct In {
+            pub option: WriteOption,
+            pub _padding_0: [u8; 4],
+            pub offset: i64,
+            pub size: i64,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 24]>;
+        let data_in: In = In {
+            option,
+            offset,
+            size,
+            _padding_0: Default::default(),
+        };
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            in_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            pre_padding: [u8; 12],
+            cmif: CmifInHeader,
+            raw_data: In,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 4],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 76]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        1,
+                        0,
+                        0,
+                        14,
+                        0,
+                        0,
+                        false,
+                    ),
+                    in_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        buffer.as_ptr() as usize,
+                        ::core::mem::size_of_val(buffer),
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 1,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::Write", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::Write", *handle);
+        }
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(())
+    }
+
+    pub fn flush(&self) -> Result<()> {
+        let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 40]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 2,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::Flush", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::Flush", *handle);
+        }
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(())
+    }
+
+    pub fn set_size(&self, size: i64) -> Result<()> {
+        let data_in = size;
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 48]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        10,
+                        0,
+                        0,
+                        false,
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 3,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::SetSize", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::SetSize", *handle);
+        }
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(())
+    }
+
+    pub fn get_size(&self) -> Result<i64> {
+        let data_in = ();
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 40]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: i64,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 48]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        8,
+                        0,
+                        0,
+                        false,
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 4,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::GetSize", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::GetSize", *handle);
+        }
+        let Response { hipc, cmif, raw_data: size, .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(size)
+    }
+
+    pub fn operate_range(
+        &self,
+        op_id: OperationId,
+        offset: i64,
+        size: i64,
+    ) -> Result<FileQueryRangeInfo> {
+        #[repr(C, packed)]
+        struct In {
+            pub op_id: OperationId,
+            pub _padding_0: [u8; 4],
+            pub offset: i64,
+            pub size: i64,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 24]>;
+        let data_in: In = In {
+            op_id,
+            offset,
+            size,
+            _padding_0: Default::default(),
+        };
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifInHeader,
+            raw_data: In,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 64]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: FileQueryRangeInfo,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 104]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        0,
+                        0,
+                        0,
+                        14,
+                        0,
+                        0,
+                        false,
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 5,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::OperateRange", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::OperateRange", *handle);
+        }
+        let Response { hipc, cmif, raw_data: out, .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(out)
+    }
+
+    pub fn operate_range_with_buffer(
+        &self,
+        out_buf: &mut [u8],
+        in_buf: &[u8],
+        op_id: OperationId,
+        offset: i64,
+        size: i64,
+    ) -> Result<()> {
+        #[repr(C, packed)]
+        struct In {
+            pub op_id: OperationId,
+            pub _padding_0: [u8; 4],
+            pub offset: i64,
+            pub size: i64,
+        }
+        let _ = ::core::mem::transmute::<In, [u8; 24]>;
+        let data_in: In = In {
+            op_id,
+            offset,
+            size,
+            _padding_0: Default::default(),
+        };
+        #[repr(packed)]
+        struct Request {
+            hipc: HipcHeader,
+            in_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            out_map_alias_desc_0: HipcMapAliasBufferDescriptor,
+            pre_padding: [u8; 0],
+            cmif: CmifInHeader,
+            raw_data: In,
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 16],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Request, [u8; 88]>;
+        #[repr(packed)]
+        struct Response {
+            hipc: HipcHeader,
+            pre_padding: [u8; 8],
+            cmif: CmifOutHeader,
+            raw_data: (),
+            raw_data_word_padding: [u8; 0],
+            post_padding: [u8; 8],
+        }
+        // Compiler time request size check
+        let _ = ::core::mem::transmute::<Response, [u8; 40]>;
+        let ipc_buffer_ptr = unsafe { get_ipc_buffer_ptr() };
+        unsafe {
+            ::core::ptr::write(
+                ipc_buffer_ptr as *mut _,
+                Request {
+                    hipc: HipcHeader::new(
+                        CommandType::Request,
+                        0,
+                        1,
+                        1,
+                        0,
+                        14,
+                        0,
+                        0,
+                        false,
+                    ),
+                    in_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        in_buf.as_ptr() as usize,
+                        ::core::mem::size_of_val(in_buf),
+                    ),
+                    out_map_alias_desc_0: HipcMapAliasBufferDescriptor::new(
+                        MapAliasBufferMode::NonSecure,
+                        out_buf.as_ptr() as usize,
+                        ::core::mem::size_of_val(out_buf),
+                    ),
+                    pre_padding: Default::default(),
+                    cmif: CmifInHeader {
+                        magic: CmifInHeader::MAGIC,
+                        version: 1,
+                        command_id: 6,
+                        token: 0,
+                    },
+                    raw_data: data_in,
+                    raw_data_word_padding: Default::default(),
+                    post_padding: Default::default(),
+                },
+            )
+        };
+        {
+            let handle = self.handle.get();
+            crate::pre_ipc_hook("fssrv::IFile::OperateRangeWithBuffer", *handle);
+            horizon_svc::send_sync_request(*handle)?;
+            crate::post_ipc_hook("fssrv::IFile::OperateRangeWithBuffer", *handle);
+        }
+        let Response { hipc, cmif, raw_data: (), .. } = unsafe {
+            ::core::ptr::read(ipc_buffer_ptr as *const _)
+        };
+        if cmif.result.is_failure() {
+            return Err(cmif.result);
+        }
+        debug_assert_eq!(hipc.num_in_pointers(), 0);
+        debug_assert_eq!(hipc.num_in_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_out_map_aliases(), 0);
+        debug_assert_eq!(hipc.num_inout_map_aliases(), 0);
+        debug_assert_eq!(hipc.out_pointer_mode(), 0);
+        debug_assert_eq!(hipc.has_special_header(), 0);
+        debug_assert_eq!(cmif.magic, CmifOutHeader::MAGIC);
+        Ok(())
     }
 }
 impl IFile<OwnedHandle> {

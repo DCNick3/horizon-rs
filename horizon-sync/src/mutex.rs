@@ -65,6 +65,24 @@ impl<T: ?Sized> Mutex<T> {
     }
 }
 
+impl<T: ?Sized + fmt::Debug> fmt::Debug for Mutex<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_struct("Mutex");
+        if let Some(guard) = self.try_lock() {
+            d.field("data", &&*guard);
+        } else {
+            struct LockedPlaceholder;
+            impl fmt::Debug for LockedPlaceholder {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    f.write_str("<locked>")
+                }
+            }
+            d.field("data", &LockedPlaceholder);
+        }
+        d.finish_non_exhaustive()
+    }
+}
+
 impl<'mutex, T: ?Sized> MutexGuard<'mutex, T> {
     unsafe fn new(lock: &'mutex Mutex<T>) -> MutexGuard<'mutex, T> {
         MutexGuard { lock }
