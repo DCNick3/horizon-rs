@@ -1,5 +1,7 @@
 //! Implements a storage for mount point list
 
+ij_core_workaround!();
+
 use core::mem::{ManuallyDrop, MaybeUninit};
 
 use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle};

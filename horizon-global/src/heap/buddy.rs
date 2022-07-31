@@ -12,6 +12,8 @@
 //! size.  This simplifies a lot of bookkeeping, because all our block
 //! sizes are a power of 2, which makes it easy to have one free list per
 //! block size.
+ij_core_workaround!();
+
 use core::alloc::Layout;
 use core::cmp::{max, min};
 use core::mem::size_of;

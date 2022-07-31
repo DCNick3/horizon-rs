@@ -1,3 +1,5 @@
+ij_core_workaround!();
+
 use core::mem::MaybeUninit;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

@@ -1,6 +1,9 @@
 //! This uses a buddy memory allocator to coarsely distribute memory between dlmalloc (or any other heap) and some other alloc that may be used
 //!
 //! uwin use-case: get some memory pages to feed it to svc::map_process_code_memory to remap them to arbitrary address inside alias region
+
+ij_core_workaround!();
+
 use core::alloc::Layout;
 use core::mem::MaybeUninit;
 use core::ptr::NonNull;
