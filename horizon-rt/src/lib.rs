@@ -1,4 +1,4 @@
-//! This care implements the low-level startup code for horizon OS processes'
+//! This crate implements the low-level startup code for horizon OS processes'
 //!
 //! It is the first thing that would run in your process
 //!
