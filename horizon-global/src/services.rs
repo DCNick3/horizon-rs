@@ -24,6 +24,7 @@ macro_rules! normal_service {
             }
 
             impl Guard {
+                #[inline]
                 fn inner(&self) -> RefHandle<'_> {
                     // SAFETY: we do not create guards in case there is no handle in the lock
                     unsafe { self.guard.as_ref().unwrap_unchecked() }.as_ref()

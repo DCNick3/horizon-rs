@@ -40,7 +40,9 @@ pub use gen::*;
 use log::{post_ipc_hook, pre_ipc_hook};
 
 #[cfg(not(feature = "log-ipc-buffers"))]
+#[inline]
 fn pre_ipc_hook(_name: &str, _handle: horizon_svc::RawHandle) {}
 
 #[cfg(not(feature = "log-ipc-buffers"))]
+#[inline]
 fn post_ipc_hook(_name: &str, _handle: horizon_svc::RawHandle) {}
