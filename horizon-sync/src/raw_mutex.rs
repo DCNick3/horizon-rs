@@ -1,42 +1,11 @@
+ij_core_workaround!();
+
 use core::sync::atomic::{
-    AtomicI32,
+    AtomicU32,
     Ordering::{Acquire, Relaxed, Release},
 };
-use core::time::Duration;
-use horizon_error::KernelErrorCode;
 
-use horizon_svc::{ArbitrationType, SignalType};
-
-pub fn futex_wait(futex: &AtomicI32, expected: i32, timeout: Option<Duration>) -> bool {
-    match unsafe {
-        horizon_svc::wait_for_address(
-            futex as *const AtomicI32,
-            ArbitrationType::WaitIfEqual,
-            expected,
-            timeout,
-        )
-    }
-    .map_err(|e| e.try_as::<KernelErrorCode>().unwrap())
-    {
-        Ok(_) => true,
-        Err(e) => match e {
-            // the futex did not have the expected value
-            KernelErrorCode::InvalidState => true,
-
-            KernelErrorCode::TimedOut => false,
-
-            // some unknown error, let's panic
-            e => panic!("futex_wait: {:?}", e),
-        },
-    }
-}
-
-pub fn futex_wake(futex: &AtomicI32) {
-    unsafe {
-        horizon_svc::signal_to_address(futex as *const AtomicI32, SignalType::Signal, 0, 1)
-            .unwrap();
-    }
-}
+use crate::futex::{futex_wait, futex_wake};
 
 /// The implementation is taken from new rust stdlib mutex based on futex
 ///
@@ -49,14 +18,14 @@ pub struct RawMutex {
     /// 0: unlocked
     /// 1: locked, no other threads waiting
     /// 2: locked, and other threads waiting (contended)
-    pub value: AtomicI32,
+    pub value: AtomicU32,
 }
 
 impl RawMutex {
     #[inline]
     pub const fn new() -> Self {
         Self {
-            value: AtomicI32::new(0),
+            value: AtomicU32::new(0),
         }
     }
 
@@ -109,7 +78,7 @@ impl RawMutex {
         }
     }
 
-    fn spin(&self) -> i32 {
+    fn spin(&self) -> u32 {
         let mut spin = 100;
         loop {
             // We only use `load` (and not `swap` or `compare_exchange`)

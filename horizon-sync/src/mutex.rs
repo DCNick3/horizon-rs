@@ -1,5 +1,7 @@
 //! This module implements a mutex wrapper type
-//! Most code is borrowed from libstd
+//! Most code is borrowed from libstd, but without the poisoning
+
+ij_core_workaround!();
 
 use crate::raw_mutex::RawMutex;
 use core::cell::UnsafeCell;
