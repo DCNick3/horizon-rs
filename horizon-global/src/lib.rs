@@ -29,7 +29,7 @@ macro_rules! ij_core_workaround {
 pub mod environment;
 pub mod heap;
 pub mod mounts;
-pub mod sm_session;
+pub mod services;
 pub mod virtual_memory;
 
 #[no_mangle]

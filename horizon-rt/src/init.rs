@@ -151,8 +151,8 @@ pub unsafe fn init(
     horizon_global::environment::init(environment);
     horizon_global::virtual_memory::init(memory_map);
     horizon_global::heap::init(heap.0, heap.1);
-    horizon_global::mounts::init();
-    horizon_global::sm_session::init(sm_session.into_inner());
+    horizon_global::services::sm::replace(sm_session.into_inner());
+    horizon_global::services::fs::replace(fs_session.into_inner());
 
     rt_unwrap(
         horizon_global::mounts::write().add("sdmc", MountDevice::IFileSystem(sd_fs.into_inner())),

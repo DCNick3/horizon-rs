@@ -2,11 +2,11 @@
 
 ij_core_workaround!();
 
-use core::mem::{ManuallyDrop, MaybeUninit};
+use core::mem::ManuallyDrop;
 
 use horizon_ipc::handle_storage::{HandleStorage, OwnedHandle, RefHandle};
 use horizon_ipc::RawHandle;
-use horizon_sync::mutex::Mutex;
+use horizon_sync::rw_lock::RwLock;
 
 /// Represents a device that can be mounted
 #[derive(Copy, Clone, Debug)]
@@ -126,20 +126,41 @@ type Mounts = [Mount; MOUNTPOINT_COUNT];
 
 /// Maximum number of mount points that you can have
 pub const MOUNTPOINT_COUNT: usize = 32;
-static mut MOUNT_POINTS: MaybeUninit<Mutex<Mounts>> = MaybeUninit::uninit();
-
-/// Initialize the mount point storage
-///
-/// # Safety
-///
-/// Must be called only once
-/// Must be called before any calls to [read] and [write()]
-/// It's usually called by horizon-rt in early process initialization, so usually you don't call this
-pub unsafe fn init() {
-    let mounts: [Mount; 32] = Default::default();
-
-    MOUNT_POINTS.write(Mutex::new(mounts));
-}
+static MOUNT_POINTS: RwLock<Mounts> = RwLock::new([
+    // This is horrible, but I don't think it's possible to do this in const context in other way
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+    Mount::empty(),
+]);
 
 fn find_empty_mount(mounts: &Mounts) -> Option<usize> {
     mounts
@@ -234,10 +255,9 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-// TODO: use an actual RwLock here
 /// RAII structure used to guard the read access to mountpoint list
 pub struct ReadGuard {
-    guard: horizon_sync::mutex::MutexGuard<'static, Mounts>,
+    guard: horizon_sync::rw_lock::RwLockReadGuard<'static, Mounts>,
 }
 
 impl ReadGuard {
@@ -257,10 +277,9 @@ impl ReadGuard {
     }
 }
 
-// TODO: use an actual RwLock here
 /// RAII structure used to guard the write access to mountpoint list
 pub struct WriteGuard {
-    guard: horizon_sync::mutex::MutexGuard<'static, Mounts>,
+    guard: horizon_sync::rw_lock::RwLockWriteGuard<'static, Mounts>,
 }
 
 impl WriteGuard {
@@ -301,7 +320,7 @@ impl WriteGuard {
 /// (This should allow multiple threads to access this in read-only fashion)
 pub fn read() -> ReadGuard {
     ReadGuard {
-        guard: unsafe { MOUNT_POINTS.assume_init_ref() }.lock(),
+        guard: MOUNT_POINTS.read(),
     }
 }
 
@@ -310,6 +329,6 @@ pub fn read() -> ReadGuard {
 /// (This ensures that only one thread accesses the mount point list)
 pub fn write() -> WriteGuard {
     WriteGuard {
-        guard: unsafe { MOUNT_POINTS.assume_init_ref() }.lock(),
+        guard: MOUNT_POINTS.write(),
     }
 }

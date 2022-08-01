@@ -1,6 +1,8 @@
 //! This module implements an RW Lock wrapper type
 //! Most code is borrowed from libstd, but without the poisoning
 
+ij_core_workaround!();
+
 use crate::core::cell::UnsafeCell;
 use crate::core::fmt;
 use crate::core::ops::{Deref, DerefMut};
@@ -31,7 +33,7 @@ pub struct RwLockWriteGuard<'a, T: ?Sized + 'a> {
 unsafe impl<T: ?Sized + Sync> Sync for RwLockWriteGuard<'_, T> {}
 
 impl<T> RwLock<T> {
-    pub fn new(t: T) -> RwLock<T> {
+    pub const fn new(t: T) -> RwLock<T> {
         RwLock {
             inner: RawRwLock::new(),
             data: UnsafeCell::new(t),
@@ -133,6 +135,15 @@ impl<'rwlock, T: ?Sized> RwLockReadGuard<'rwlock, T> {
 impl<'rwlock, T: ?Sized> RwLockWriteGuard<'rwlock, T> {
     unsafe fn new(lock: &'rwlock RwLock<T>) -> RwLockWriteGuard<'rwlock, T> {
         RwLockWriteGuard { lock }
+    }
+
+    pub fn downgrade(self) -> RwLockReadGuard<'rwlock, T> {
+        unsafe { self.lock.inner.write_downgrade() };
+        let lock = self.lock;
+        // don't call the destructor - as it does a `write_unlock`
+        core::mem::forget(self);
+
+        RwLockReadGuard { lock }
     }
 }
 

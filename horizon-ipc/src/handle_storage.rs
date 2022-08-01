@@ -9,10 +9,12 @@ use horizon_svc::RawHandle;
 
 /// A type mostly used to represent a handle borrow
 /// mostly needed for PooledHandle, other storage types do this as a no-op
+///
+/// You are not supposed to look inside
 pub struct HandleRef<'a, T: HandleStorage> {
-    handle: RawHandle,
-    index: u32,
-    storage: &'a T,
+    pub handle: RawHandle,
+    pub index: u32,
+    pub storage: &'a T,
 }
 
 impl<'a, T: HandleStorage> Deref for HandleRef<'a, T> {
@@ -31,6 +33,9 @@ impl<'a, T: HandleStorage> Drop for HandleRef<'a, T> {
     }
 }
 
+/// A type that encapsulates a handle, managing its lifetime
+///
+/// You are not supposed to implement it usually
 pub trait HandleStorage: Sized + Display {
     fn get(&self) -> HandleRef<'_, Self>;
     fn give_back(&self, handle: &HandleRef<'_, Self>);
@@ -108,6 +113,11 @@ impl RefHandle<'_> {
             handle,
             phantom: PhantomData {},
         }
+    }
+
+    #[inline]
+    pub fn inner(&self) -> RawHandle {
+        self.handle
     }
 }
 

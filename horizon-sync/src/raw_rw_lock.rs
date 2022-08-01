@@ -179,6 +179,37 @@ impl RawRwLock {
         }
     }
 
+    #[inline]
+    pub unsafe fn write_downgrade(&self) {
+        // change the state so that we are the only reader now
+        let state = self.state.fetch_sub(WRITE_LOCKED - 1, Release) - (WRITE_LOCKED - 1);
+
+        // wake other readers as needed (can't unlock writers here obviously)
+        if has_readers_waiting(state) {
+            // TODO: this is not thoroughly tested
+            self.downgrade_slow(state);
+        }
+    }
+
+    #[cold]
+    fn downgrade_slow(&self, mut state: u32) {
+        // We only reach this point if READERS_WAITING is set.
+        while state & READERS_WAITING != 0 {
+            // wake up only readers
+            match self
+                .state
+                .compare_exchange(state, state & !READERS_WAITING, Relaxed, Relaxed)
+            {
+                Ok(_) => {
+                    futex_wake_all(&self.state);
+                }
+                Err(cur_state) => {
+                    state = cur_state;
+                }
+            }
+        }
+    }
+
     #[cold]
     fn write_contended(&self) {
         let mut state = self.spin_write();
