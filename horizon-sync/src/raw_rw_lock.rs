@@ -1,5 +1,7 @@
 //! RwLock implementation mostly copied from libstd futex-based implementation
 
+ij_core_workaround!();
+
 use super::futex::{futex_wait, futex_wake, futex_wake_all};
 use core::sync::atomic::{
     AtomicU32,

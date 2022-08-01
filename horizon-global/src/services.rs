@@ -7,6 +7,8 @@ macro_rules! normal_service {
         pub mod $name {
             #![doc = concat!("This is a session storage for service ", stringify!($name))]
 
+            ij_core_workaround!();
+
             use crate::core::fmt::{Display, Formatter};
             use horizon_ipc::handle_storage::{HandleRef, HandleStorage, OwnedHandle, RefHandle};
             use horizon_sync::rw_lock::{RwLock, RwLockReadGuard};

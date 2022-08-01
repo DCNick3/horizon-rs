@@ -16,7 +16,7 @@ pub struct RwLock<T: ?Sized> {
 unsafe impl<T: ?Sized + Send> Send for RwLock<T> {}
 unsafe impl<T: ?Sized + Send + Sync> Sync for RwLock<T> {}
 
-pub struct RwLockReadGuard<'a, T: ?Sized + 'a> {
+pub struct RwLockReadGuard<'a, T: ?Sized> {
     lock: &'a RwLock<T>,
 }
 
@@ -24,7 +24,7 @@ pub struct RwLockReadGuard<'a, T: ?Sized + 'a> {
 // impl<T: ?Sized> !Send for RwLockReadGuard<'_, T> {}
 unsafe impl<T: ?Sized + Sync> Sync for RwLockReadGuard<'_, T> {}
 
-pub struct RwLockWriteGuard<'a, T: ?Sized + 'a> {
+pub struct RwLockWriteGuard<'a, T: ?Sized> {
     lock: &'a RwLock<T>,
 }
 
