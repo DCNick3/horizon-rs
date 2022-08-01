@@ -19,8 +19,6 @@ pub enum RtAbortReason {
     NoMainThreadHandleInNsoEnv,
     MemoryMapReadFailed,
     MakeHeapFailed,
-    SmOpenNamedPortFailed,
-    SmInitializeFailed,
     FsOpenFailed,
     SdFsOpenFailed,
     SdFsMountFailed,

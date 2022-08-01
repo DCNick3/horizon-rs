@@ -6,7 +6,6 @@ use horizon_error::Result;
 use horizon_global::environment::{Environment, EnvironmentType, HorizonVersion};
 use horizon_global::mounts::MountDevice;
 use horizon_global::virtual_memory::{MemoryMap, MemoryRegion};
-use horizon_ipcdef::sm::{IUserInterface, ServiceName};
 use horizon_svc::{InfoType, CURRENT_PROCESS_PSEUDO_HANDLE};
 
 use crate::rt_abort::rt_unwrap;
@@ -130,18 +129,10 @@ pub unsafe fn init(
         (addr, size)
     };
 
-    let sm_session = rt_unwrap(
-        IUserInterface::open_named_port(),
-        RtAbortReason::SmOpenNamedPortFailed,
-    );
-
-    rt_unwrap(sm_session.initialize(), RtAbortReason::SmInitializeFailed);
-
     let fs_session = rt_unwrap(
-        sm_session.get_service(ServiceName::try_new("fsp-srv").unwrap_unchecked()),
+        horizon_ipcdef::fssrv::IFileSystemProxy::get(),
         RtAbortReason::FsOpenFailed,
     );
-    let fs_session = horizon_ipcdef::fssrv::IFileSystemProxy::new(fs_session);
 
     let sd_fs = rt_unwrap(
         fs_session.open_sd_card_file_system(),
@@ -151,8 +142,6 @@ pub unsafe fn init(
     horizon_global::environment::init(environment);
     horizon_global::virtual_memory::init(memory_map);
     horizon_global::heap::init(heap.0, heap.1);
-    horizon_global::services::sm::replace(sm_session.into_inner());
-    horizon_global::services::fs::replace(fs_session.into_inner());
 
     rt_unwrap(
         horizon_global::mounts::write().add("sdmc", MountDevice::IFileSystem(sd_fs.into_inner())),

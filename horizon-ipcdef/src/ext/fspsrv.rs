@@ -1,7 +1,19 @@
 ij_core_workaround!();
 
-use crate::fssrv::Path;
+use crate::fssrv::{IFileSystemProxy, Path};
+use crate::sm::{IUserInterface, ServiceName};
 use core::str::Utf8Error;
+use horizon_error::Result;
+use horizon_global::services;
+
+impl IFileSystemProxy {
+    pub fn get() -> Result<IFileSystemProxy<services::fs::Guard>> {
+        Ok(IFileSystemProxy::new(services::fs::get_or_connect(|| {
+            let sm = IUserInterface::get()?;
+            sm.get_service(ServiceName::try_new("fsp-srv").unwrap())
+        })?))
+    }
+}
 
 const PATH_SIZE: usize = 0x300;
 
@@ -22,7 +34,7 @@ impl Path {
         Some(r)
     }
 
-    pub fn as_str(&self) -> Result<&str, Utf8Error> {
+    pub fn as_str(&self) -> core::result::Result<&str, Utf8Error> {
         core::str::from_utf8(self.as_ref())
     }
 }

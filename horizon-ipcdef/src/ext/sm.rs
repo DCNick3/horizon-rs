@@ -4,6 +4,7 @@ use crate::gen::sm::IUserInterface;
 use crate::sm::ServiceName;
 use core::fmt::{Display, Formatter};
 use horizon_error::Result;
+use horizon_global::services;
 use horizon_ipc::handle_storage::OwnedHandle;
 use horizon_svc::RawHandle;
 
@@ -20,6 +21,14 @@ impl IUserInterface {
         Ok(Self {
             handle: OwnedHandle::new(handle),
         })
+    }
+
+    pub fn get() -> Result<IUserInterface<services::sm::Guard>> {
+        Ok(IUserInterface::new(services::sm::get_or_connect(|| {
+            let sm = Self::open_named_port()?;
+            sm.initialize()?;
+            Ok(sm.into_inner())
+        })?))
     }
 }
 

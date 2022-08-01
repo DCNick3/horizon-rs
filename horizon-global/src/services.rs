@@ -74,12 +74,14 @@ macro_rules! normal_service {
             }
 
             /// Get currently stored session or create a new one with a function (atomically)
-            pub fn get_or_connect<F: FnOnce() -> OwnedHandle>(function: F) -> Guard {
+            pub fn get_or_connect<F: FnOnce() -> horizon_error::Result<OwnedHandle>>(
+                function: F,
+            ) -> horizon_error::Result<Guard> {
                 loop {
                     {
                         let guard = SESSION.read();
                         if guard.is_some() {
-                            return Guard { guard };
+                            return Ok(Guard { guard });
                         }
                     }
 
@@ -88,13 +90,13 @@ macro_rules! normal_service {
                         // somebody might have put the service while we were swapping READ lock for WRITE
                         if guard.is_none() {
                             // so open a new handle only if needed
-                            guard.replace(function());
+                            guard.replace(function()?);
                         }
 
                         // and downgrade our WRITE guard to a READ one
-                        return Guard {
+                        return Ok(Guard {
                             guard: guard.downgrade(),
-                        };
+                        });
                     }
                 }
             }
@@ -104,3 +106,4 @@ macro_rules! normal_service {
 
 normal_service!(sm);
 normal_service!(fs);
+normal_service!(csrng);

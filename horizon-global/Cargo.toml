@@ -11,6 +11,7 @@ compiler_builtins = { version = "0.1.70", optional = true }
 
 horizon-sync = { path = "../horizon-sync" }
 horizon-ipc = { path = "../horizon-ipc" }
+horizon-error = { path = "../horizon-error" }
 
 [features]
 rustc-dep-of-std = [
@@ -18,4 +19,5 @@ rustc-dep-of-std = [
     'compiler_builtins',
     'horizon-sync/rustc-dep-of-std',
     'horizon-ipc/rustc-dep-of-std',
+    'horizon-error/rustc-dep-of-std',
 ]
