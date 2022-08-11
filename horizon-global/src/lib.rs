@@ -32,6 +32,34 @@ macro_rules! ij_core_workaround {
     };
 }
 
+// Guard against horizon-global ABI breakage
+// The version should be bumped on each ABI-breaking change in horizon-global
+// If you are getting "Undefined symbol" errors with this, you should probably update your rust toolchain
+macro_rules! abi_version {
+    ($abi_version:literal) => {
+        mod abi_guard {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "impl")] {
+                    #[used]
+                    #[no_mangle]
+                    #[export_name = concat!("__horizon_global_abi_version_", stringify!($abi_version), "_guard")]
+                    static __GUARD: u32 = $abi_version;
+                } else {
+                    extern "Rust" {
+                        #[link_name = concat!("__horizon_global_abi_version_", stringify!($abi_version), "_guard")]
+                        static __GUARD: u32;
+                    }
+                    #[no_mangle]
+                    pub fn __horizon_global_abi_guard() -> u32 {
+                        unsafe { __GUARD }
+                    }
+                }
+            }
+        }
+    };
+}
+abi_version!(2);
+
 pub mod environment;
 pub mod heap;
 pub mod mounts;
@@ -41,6 +69,7 @@ cfg_if! {
         pub mod virtual_memory;
         // Guard against double implementation
         // TODO: guard against ABI-breaking stuff
+        #[no_mangle]
         pub static __HORIZON_GLOBAL_IF_YOU_SEE_THIS_SYMBOL_IN_DUPLICATE_SYMBOL_LINKER_ERROR_YOU_HAVE_MULTIPLE_HORIZON_GLOBAL_CRATES_WHICH_IS_REALLY_BAD: u32 = 1;
     }
 }
