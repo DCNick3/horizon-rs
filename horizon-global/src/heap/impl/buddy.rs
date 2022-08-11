@@ -197,7 +197,7 @@ impl<const N: usize> Heap<N> {
         // Calculate our minimum block size based on the number of free
         // lists we have available.
         let min_block_size = heap_size >> (N - 1);
-        let mut free_lists: [*mut FreeBlock; N] = [core::ptr::null_mut(); N];
+        let mut free_lists: [*mut FreeBlock; N] = [ptr::null_mut(); N];
 
         // Insert the entire heap into the last free list.
         // See the documentation for `free_lists` - the last entry contains

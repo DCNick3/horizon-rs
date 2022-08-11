@@ -11,3 +11,4 @@ pub mod fssrv;
 pub mod ldr;
 pub mod ncm;
 pub mod sm;
+pub mod spl;

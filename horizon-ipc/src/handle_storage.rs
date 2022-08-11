@@ -41,6 +41,7 @@ pub trait HandleStorage: Sized + Display {
     fn give_back(&self, handle: &HandleRef<'_, Self>);
 }
 
+#[repr(transparent)]
 pub struct OwnedHandle {
     handle: RawHandle,
 }
@@ -98,6 +99,7 @@ impl HandleStorage for OwnedHandle {
 }
 
 #[derive(Copy, Clone)]
+#[repr(transparent)]
 pub struct RefHandle<'a> {
     handle: RawHandle,
     phantom: PhantomData<&'a ()>,

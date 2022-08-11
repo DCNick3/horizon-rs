@@ -1,0 +1,3 @@
+interface spl::IRandomInterface is "csrng" {
+    [0] GenerateRandomBytes(sf::OutMapAliasBuffer buffer);
+}
